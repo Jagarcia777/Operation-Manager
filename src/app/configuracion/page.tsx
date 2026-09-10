@@ -7,6 +7,7 @@ import {
   archivarNota,
   cambiarEstadoCorte,
   crearCorte,
+  eliminarCorte,
   guardarPerfil,
   guardarTienda,
   guardarUmbral,
@@ -243,7 +244,10 @@ async function SeccionCatalogo() {
 }
 
 async function SeccionCortes() {
-  const cortes = await prisma.corte.findMany({ orderBy: { fechaFin: "desc" } });
+  const cortes = await prisma.corte.findMany({
+    orderBy: { fechaFin: "desc" },
+    include: { _count: { select: { ventas: true, ajustes: true, alertas: true } } },
+  });
 
   return (
     <div className="space-y-4">
@@ -296,21 +300,36 @@ async function SeccionCortes() {
               <p className="text-xs text-texto-3">
                 {fechaCorta(corte.fechaInicio)} al {fechaCorta(corte.fechaFin)} ·{" "}
                 {ETIQUETA_TIPO_CORTE[corte.tipo as keyof typeof ETIQUETA_TIPO_CORTE] ?? corte.tipo}
+                {" · "}
+                {corte._count.ventas} tiendas cargadas, {corte._count.ajustes} ajustes,{" "}
+                {corte._count.alertas} alertas
               </p>
             </div>
-            <form action={cambiarEstadoCorte} className="flex items-center gap-2">
-              <input type="hidden" name="id" value={corte.id} />
-              <select name="estado" defaultValue={corte.estado} className="campo w-36">
-                {ESTADOS_CORTE.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {ETIQUETA_ESTADO_CORTE[estado]}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="boton boton-secundario">
-                Aplicar
-              </button>
-            </form>
+            <div className="flex items-center gap-2">
+              <form action={cambiarEstadoCorte} className="flex items-center gap-2">
+                <input type="hidden" name="id" value={corte.id} />
+                <select name="estado" defaultValue={corte.estado} className="campo w-36">
+                  {ESTADOS_CORTE.map((estado) => (
+                    <option key={estado} value={estado}>
+                      {ETIQUETA_ESTADO_CORTE[estado]}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="boton boton-secundario">
+                  Aplicar
+                </button>
+              </form>
+              <form action={eliminarCorte}>
+                <input type="hidden" name="id" value={corte.id} />
+                <button
+                  type="submit"
+                  className="boton boton-secundario text-alerta"
+                  title="Borra el corte con sus registros, ajustes y alertas"
+                >
+                  Eliminar
+                </button>
+              </form>
+            </div>
           </div>
         ))}
       </div>

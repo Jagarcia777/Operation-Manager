@@ -114,6 +114,16 @@ export async function cambiarEstadoCorte(formData: FormData) {
   refrescar();
 }
 
+/** Borra el corte con todo lo que cuelga de él: registros, ajustes, alertas y análisis. */
+export async function eliminarCorte(formData: FormData) {
+  const id = texto(formData, "id");
+  if (!id) return;
+  await prisma.corte.delete({ where: { id } });
+  refrescar();
+  revalidatePath("/alertas");
+  revalidatePath("/ajustes");
+}
+
 export async function guardarUmbral(formData: FormData) {
   const id = texto(formData, "id");
   const valor = numero(formData, "valor");
