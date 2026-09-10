@@ -70,6 +70,7 @@ export async function guardarTienda(formData: FormData) {
     nombre,
     zonaId,
     codigo: texto(formData, "codigo"),
+    alias: texto(formData, "alias"),
     ciudad: texto(formData, "ciudad"),
     formato: texto(formData, "formato"),
     metrosCuadrados: numero(formData, "metrosCuadrados"),

@@ -66,6 +66,7 @@ export default async function RevisarExtraccionPage({ params }: PageProps<"/carg
     id: tienda.id,
     nombre: tienda.nombre,
     codigo: tienda.codigo,
+    alias: tienda.alias,
   }));
 
   const esAjustes = extraccion.destino === "AJUSTES";

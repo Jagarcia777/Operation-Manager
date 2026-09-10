@@ -32,6 +32,11 @@ model Tienda {
   zonaId String
   zona   Zona    @relation(fields: [zonaId], references: [id], onDelete: Cascade)
 
+  // Una misma tienda viaja con distintos nombres según el reporte ("Plaza Mayor" en el comercial,
+  // "SUC. LECHERÍA" en el del sistema). Aquí van esos otros nombres, uno por línea, para que la
+  // lectura automática la reconozca igual.
+  alias String?
+
   // Atributos para una cadena en crecimiento: fechaApertura permite aislar las tiendas nuevas
   // del comparativo (ventas comparables) y metrosCuadrados habilita productividad por m².
   ciudad          String?

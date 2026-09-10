@@ -17,7 +17,21 @@ export type Emparejamiento = {
   exacto: boolean;
 };
 
-type TiendaCatalogo = { id: string; nombre: string; codigo: string | null };
+type TiendaCatalogo = {
+  id: string;
+  nombre: string;
+  codigo: string | null;
+  alias?: string | null;
+};
+
+/** Nombre oficial, código y todos los alias con los que la tienda aparece en los reportes. */
+function nombresDe(tienda: TiendaCatalogo) {
+  const alias = (tienda.alias ?? "")
+    .split(/[\n,;]/)
+    .map((entrada) => entrada.trim())
+    .filter(Boolean);
+  return [tienda.nombre, ...(tienda.codigo ? [tienda.codigo] : []), ...alias].map(normalizar);
+}
 
 export function emparejarTienda(
   nombreLeido: string,
@@ -25,11 +39,7 @@ export function emparejarTienda(
 ): Emparejamiento {
   const objetivo = normalizar(nombreLeido);
 
-  const exacta = catalogo.find(
-    (tienda) =>
-      normalizar(tienda.nombre) === objetivo ||
-      (tienda.codigo ? normalizar(tienda.codigo) === objetivo : false),
-  );
+  const exacta = catalogo.find((tienda) => nombresDe(tienda).includes(objetivo));
   if (exacta) {
     return {
       nombreLeido,
@@ -39,10 +49,12 @@ export function emparejarTienda(
     };
   }
 
-  const parcial = catalogo.find((tienda) => {
-    const nombre = normalizar(tienda.nombre);
-    return objetivo.length > 2 && (nombre.includes(objetivo) || objetivo.includes(nombre));
-  });
+  const parcial = catalogo.find((tienda) =>
+    nombresDe(tienda).some(
+      (nombre) =>
+        objetivo.length > 2 && (nombre.includes(objetivo) || objetivo.includes(nombre)),
+    ),
+  );
 
   return {
     nombreLeido,

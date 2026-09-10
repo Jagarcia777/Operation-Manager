@@ -181,6 +181,15 @@ async function SeccionCatalogo() {
                     className="campo mt-1 w-20"
                   />
                 </label>
+                <label className="text-xs text-texto-3" title="Otros nombres con los que aparece en los reportes, separados por coma">
+                  Otros nombres
+                  <input
+                    name="alias"
+                    defaultValue={tienda.alias ?? ""}
+                    placeholder="SUC. LECHERÍA"
+                    className="campo mt-1 w-40"
+                  />
+                </label>
                 <label className="text-xs text-texto-3">
                   Ciudad
                   <input
