@@ -13,14 +13,44 @@ datasource db {
 }
 
 model Zona {
-  id       String        @id @default(cuid())
-  nombre   String        @unique
-  gerente  String
-  orden    Int           @default(0)
-  tiendas  Tienda[]
-  planes   PlanAccion[]
-  notas    NotaMemoria[]
-  perfiles Perfil[]
+  id      String @id @default(cuid())
+  nombre  String @unique
+  gerente String
+  orden   Int    @default(0)
+
+  // Zona Oriente se gestiona tienda por tienda; el resto de la cadena entra como total de zona,
+  // porque de esas sucursales solo llega el agregado. Es la línea de comparación.
+  detallada Boolean @default(false)
+
+  tiendas   Tienda[]
+  registros RegistroZona[]
+  planes    PlanAccion[]
+  notas     NotaMemoria[]
+  perfiles  Perfil[]
+}
+
+// Cifras agregadas de una zona que no se gestiona al detalle. Aquí sí se captura el total,
+// porque no hay detalle de tienda del cual derivarlo.
+model RegistroZona {
+  id      String @id @default(cuid())
+  corteId String
+  zonaId  String
+  corte   Corte  @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  zona    Zona   @relation(fields: [zonaId], references: [id], onDelete: Cascade)
+
+  ventasMeta        Float?
+  ventasReal        Float?
+  unidadesMeta      Float?
+  unidadesReal      Float?
+  transaccionesMeta Float?
+  transaccionesReal Float?
+  margenBrutoMeta   Float?
+  margenBrutoReal   Float?
+
+  origen        String   @default("MANUAL")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, zonaId])
 }
 
 model Tienda {
@@ -44,11 +74,12 @@ model Tienda {
   metrosCuadrados Float?
   fechaApertura   DateTime?
 
-  ventas  RegistroVentas[]
-  ajustes RegistroAjuste[]
-  alertas Alerta[]
-  planes  PlanAccion[]
-  notas   NotaMemoria[]
+  ventas     RegistroVentas[]
+  ajustes    RegistroAjuste[]
+  categorias RegistroCategoria[]
+  alertas    Alerta[]
+  planes     PlanAccion[]
+  notas      NotaMemoria[]
 
   @@index([zonaId])
 }
@@ -64,13 +95,15 @@ model Corte {
   diasTranscurridos Int?
   creadoEn          DateTime @default(now())
 
-  ventas       RegistroVentas[]
-  ajustes      RegistroAjuste[]
-  alertas      Alerta[]
-  extracciones Extraccion[]
-  planes       PlanAccion[]
-  notas        NotaMemoria[]
-  analisis     Analisis[]
+  ventas        RegistroVentas[]
+  registrosZona RegistroZona[]
+  categorias    RegistroCategoria[]
+  ajustes       RegistroAjuste[]
+  alertas       Alerta[]
+  extracciones  Extraccion[]
+  planes        PlanAccion[]
+  notas         NotaMemoria[]
+  analisis      Analisis[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -128,6 +161,36 @@ model RegistroAjuste {
   actualizadoEn DateTime @updatedAt
 
   @@unique([corteId, tiendaId, tipologia])
+  @@index([tiendaId])
+}
+
+// Categorías de venta (Carnicería, Charcutería, …): la dimensión donde se ve de dónde sale el
+// margen y qué está drenando el resultado, más allá del total de la tienda.
+model Categoria {
+  id        String              @id @default(cuid())
+  nombre    String              @unique
+  orden     Int                 @default(0)
+  registros RegistroCategoria[]
+}
+
+model RegistroCategoria {
+  id          String    @id @default(cuid())
+  corteId     String
+  tiendaId    String
+  categoriaId String
+  corte       Corte     @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda      Tienda    @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  ventasReal      Float?
+  unidadesReal    Float?
+  margenBrutoReal Float?
+
+  origen        String   @default("MANUAL")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, tiendaId, categoriaId])
+  @@index([categoriaId])
   @@index([tiendaId])
 }
 

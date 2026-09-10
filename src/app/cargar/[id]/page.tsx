@@ -23,7 +23,7 @@ const CAMPOS_AJUSTES = [
   { clave: "mercanciaDanada", titulo: "Mercancía Dañada" },
   { clave: "cargaYDescarga", titulo: "Carga y Descarga" },
   { clave: "inventario", titulo: "Inventario" },
-  { clave: "erroresDeVenta", titulo: "Errores de Venta" },
+  { clave: "ventas", titulo: "Ventas" },
 ] as const;
 
 type LecturaVentas = {

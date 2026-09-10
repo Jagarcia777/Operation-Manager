@@ -14,6 +14,8 @@ export type BloqueTabla<F, S> = {
   zonaId: string;
   zona: string;
   gerente: string;
+  /** Aclaración junto al nombre de la zona, p. ej. que entra sin detalle de tienda. */
+  nota?: string;
   tiendas: F[];
   subtotal: S;
 };
@@ -46,7 +48,12 @@ export function TablaZonas<F extends { tiendaId: string; tienda: string }, S>({
           {zonas.map((bloque) => (
             <Fragment key={bloque.zonaId}>
               <tr className="fila-zona">
-                <td>{bloque.zona}</td>
+                <td>
+                  {bloque.zona}
+                  {bloque.nota && (
+                    <span className="ml-2 text-xs font-normal text-texto-3">{bloque.nota}</span>
+                  )}
+                </td>
                 {columnas.map((columna) => (
                   <td
                     key={columna.titulo}

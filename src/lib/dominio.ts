@@ -16,12 +16,13 @@ export const ETIQUETA_ESTADO_CORTE: Record<EstadoCorte, string> = {
   CERRADO: "Cerrado",
 };
 
+// Orden y nombres tal como vienen en el reporte de ajustes de la cadena.
 export const TIPOLOGIAS = [
   "MERMA",
   "MERCANCIA_DANADA",
   "CARGA_DESCARGA",
   "INVENTARIO",
-  "ERRORES_VENTA",
+  "VENTAS",
 ] as const;
 export type Tipologia = (typeof TIPOLOGIAS)[number];
 export const ETIQUETA_TIPOLOGIA: Record<Tipologia, string> = {
@@ -29,7 +30,7 @@ export const ETIQUETA_TIPOLOGIA: Record<Tipologia, string> = {
   MERCANCIA_DANADA: "Mercancía Dañada",
   CARGA_DESCARGA: "Carga y Descarga",
   INVENTARIO: "Inventario",
-  ERRORES_VENTA: "Errores de Venta",
+  VENTAS: "Ventas",
 };
 
 export const INDICADORES = [
@@ -44,6 +45,24 @@ export const ETIQUETA_INDICADOR: Record<Indicador, string> = {
   unidades: "Unidades",
   transacciones: "Transacciones",
   margenBruto: "%MB",
+};
+
+// Clasificación de categorías: Pareto separa lo vital de lo accesorio por peso en la venta,
+// y BCG cruza ese peso con el margen que aporta.
+export const ZONAS_PARETO = ["VITAL", "COMPLEMENTO"] as const;
+export type ZonaPareto = (typeof ZONAS_PARETO)[number];
+export const ETIQUETA_PARETO: Record<ZonaPareto, string> = {
+  VITAL: "Vital (80%)",
+  COMPLEMENTO: "Complemento",
+};
+
+export const CLASES_BCG = ["ESTRELLA", "VACA_LECHERA", "INTERROGANTE", "PERRO"] as const;
+export type ClaseBcg = (typeof CLASES_BCG)[number];
+export const ETIQUETA_BCG: Record<ClaseBcg, string> = {
+  ESTRELLA: "Estrella",
+  VACA_LECHERA: "Vaca lechera",
+  INTERROGANTE: "Interrogante",
+  PERRO: "Perro",
 };
 
 export const TIPOS_ALERTA = [

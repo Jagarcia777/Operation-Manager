@@ -90,7 +90,7 @@ const CAMPO_POR_TIPOLOGIA: Record<Tipologia, string> = {
   MERCANCIA_DANADA: "mercanciaDanada",
   CARGA_DESCARGA: "cargaYDescarga",
   INVENTARIO: "inventario",
-  ERRORES_VENTA: "erroresDeVenta",
+  VENTAS: "ventas",
 };
 
 export async function confirmarExtraccion(formData: FormData) {

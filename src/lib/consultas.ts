@@ -23,11 +23,30 @@ export async function cargarTiendas() {
 }
 
 export async function cargarTablero(corteId: string) {
-  const [tiendas, registros] = await Promise.all([
+  const [tiendas, registros, agregados] = await Promise.all([
     cargarTiendas(),
     prisma.registroVentas.findMany({ where: { corteId } }),
+    prisma.registroZona.findMany({ where: { corteId }, include: { zona: true } }),
   ]);
-  return construirTablero(tiendas, registros);
+
+  return construirTablero(
+    tiendas,
+    registros,
+    agregados.map((registro) => ({
+      zonaId: registro.zonaId,
+      zona: registro.zona.nombre,
+      gerente: registro.zona.gerente,
+      orden: registro.zona.orden,
+      ventasMeta: registro.ventasMeta,
+      ventasReal: registro.ventasReal,
+      unidadesMeta: registro.unidadesMeta,
+      unidadesReal: registro.unidadesReal,
+      transaccionesMeta: registro.transaccionesMeta,
+      transaccionesReal: registro.transaccionesReal,
+      margenBrutoMeta: registro.margenBrutoMeta,
+      margenBrutoReal: registro.margenBrutoReal,
+    })),
+  );
 }
 
 export async function cargarAjustes(corteId: string) {

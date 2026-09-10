@@ -36,6 +36,9 @@ export type BloqueZona = {
   zonaId: string;
   zona: string;
   gerente: string;
+  /** Zona Oriente se abre tienda por tienda; las demás entran solo con su total. */
+  detallada: boolean;
+  orden: number;
   tiendas: FilaTienda[];
   subtotal: FilaCalculada;
 };
@@ -126,10 +129,22 @@ type TiendaEntrada = {
   zona: { id: string; nombre: string; gerente: string; orden: number };
 };
 
-/** Arma el tablero completo: tiendas por zona, subtotal de cada zona y total de la cadena. */
+/** Zona sin detalle de tienda: su total llega capturado, no derivado. */
+export type ZonaAgregada = ValoresVentas & {
+  zonaId: string;
+  zona: string;
+  gerente: string;
+  orden: number;
+};
+
+/**
+ * Arma el tablero: Zona Oriente abierta tienda por tienda, el resto de la cadena como total de
+ * zona, y el total general sumando ambas fuentes.
+ */
 export function construirTablero(
   tiendas: TiendaEntrada[],
   registros: RegistroEntrada[],
+  zonasAgregadas: ZonaAgregada[] = [],
 ): TableroVentas {
   const porTienda = new Map(registros.map((registro) => [registro.tiendaId, registro]));
   const zonas = new Map<string, BloqueZona>();
@@ -165,16 +180,30 @@ export function construirTablero(
         zonaId: tienda.zona.id,
         zona: tienda.zona.nombre,
         gerente: tienda.zona.gerente,
+        detallada: true,
+        orden: tienda.zona.orden,
         tiendas: [fila],
         subtotal: fila,
       });
     }
   }
 
-  const bloques = [...zonas.values()].map((bloque) => ({
+  const detalladas = [...zonas.values()].map((bloque) => ({
     ...bloque,
     subtotal: agregarFilas(bloque.tiendas),
   }));
+
+  const agregadas: BloqueZona[] = zonasAgregadas.map((zona) => ({
+    zonaId: zona.zonaId,
+    zona: zona.zona,
+    gerente: zona.gerente,
+    detallada: false,
+    orden: zona.orden,
+    tiendas: [],
+    subtotal: calcularFila(zona),
+  }));
+
+  const bloques = [...detalladas, ...agregadas].sort((a, b) => a.orden - b.orden);
 
   return {
     zonas: bloques,

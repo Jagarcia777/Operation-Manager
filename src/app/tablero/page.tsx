@@ -100,7 +100,14 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
         ))}
       </nav>
 
-      <TablaZonas zonas={tablero.zonas} total={total} columnas={columnas} />
+      <TablaZonas
+        zonas={tablero.zonas.map((zona) => ({
+          ...zona,
+          nota: zona.detallada ? undefined : "solo total de zona",
+        }))}
+        total={total}
+        columnas={columnas}
+      />
     </div>
   );
 }

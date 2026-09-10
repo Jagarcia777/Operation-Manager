@@ -120,19 +120,19 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
 
     if (!porcentajes.length) continue;
 
-    const centro = mediana(porcentajes.map((entrada) => entrada.valor)) ?? 0;
-    const dispersion = desviacionMediana(
-      porcentajes.map((entrada) => entrada.valor),
-      centro,
-    );
+    // Los ajustes vienen en negativo por ser en contra: lo que importa es la magnitud.
+    const magnitudes = porcentajes.map((entrada) => Math.abs(entrada.valor));
+    const centro = mediana(magnitudes) ?? 0;
+    const dispersion = desviacionMediana(magnitudes, centro);
 
     for (const entrada of porcentajes) {
       const nombre = nombrePorTienda.get(entrada.tiendaId) ?? "Tienda";
-      const superaUmbral = entrada.valor > umbrales.AJUSTE_MAX_PCT;
+      const magnitud = Math.abs(entrada.valor);
+      const superaUmbral = magnitud > umbrales.AJUSTE_MAX_PCT;
       const superaDispersion =
         dispersion !== null &&
         dispersion > 0 &&
-        entrada.valor - centro > umbrales.FACTOR_ATIPICO * dispersion;
+        magnitud - centro > umbrales.FACTOR_ATIPICO * dispersion;
 
       if (superaUmbral || superaDispersion) {
         alertas.push({

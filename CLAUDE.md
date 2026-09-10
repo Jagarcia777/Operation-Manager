@@ -1,9 +1,11 @@
 # Operation Manager
 
-Herramienta interna de control de ventas y operaciones para una cadena retail de **24 tiendas
-en 4 zonas**. Sustituye el mantenimiento manual del Tablero de Control de Ventas y del Reporte
-de Ajustes por Tipología: ingesta los números de cada corte, los valida, detecta inconsistencias
-y genera los documentos de decisión (presentaciones de tienda, informes ejecutivos, planes de acción).
+Herramienta interna de **Zona Oriente de Rio Supermarket**: 6 tiendas gestionadas al detalle
+—Puerto Ordaz, Plaza Mayor, Maturín Tipuro, Maturín Juanico, Puente Real y Valle de la Pascua—
+medidas contra la cadena nacional, que entra como línea de comparación con el total de sus otras
+zonas. Sustituye el mantenimiento manual del Tablero de Control de Ventas y del Reporte de Ajustes
+por Tipología: ingesta los números de cada corte, los valida, detecta inconsistencias y genera los
+documentos de decisión (presentaciones de tienda, informes ejecutivos, planes de acción).
 
 Requisitos completos: `docs/ESPECIFICACION.md` — es la fuente de verdad, no re-derivar desde cero.
 Estado y fases: `docs/ROADMAP.md` — actualizar las casillas al terminar cada bloque.
@@ -50,8 +52,12 @@ src/components/           componentes compartidos de UI
   del negocio: "Activo" es el valor real ejecutado, no un booleano.
 - **SQLite no soporta enums ni Json en Prisma**: usar `String` y declarar las uniones en
   `src/lib/dominio.ts` (constantes + tipos TS). Los payloads JSON se guardan como texto.
-- **Los subtotales y totales nunca se capturan**: se calculan siempre desde el detalle por
-  tienda. Si una fuente externa trae un subtotal, se compara y se levanta una alerta si difiere.
+- **Los subtotales y totales nunca se capturan** en las zonas detalladas: se derivan del detalle
+  por tienda. Si una fuente externa trae un subtotal, se compara y se levanta una alerta si
+  difiere. La excepción son las zonas con `detallada = false`, de las que solo llega el agregado:
+  esas usan `RegistroZona` y su total sí se captura, porque no hay detalle del cual derivarlo.
+- **Los ajustes por tipología van con el signo de la fuente**: negativos cuando son en contra.
+  La tipología "Ventas" puede salir a favor. Al comparar magnitudes, usar valor absoluto.
 - **La app nunca corrige datos en silencio.** Toda inconsistencia se registra como `Alerta`
   con su explicación y queda para que una persona confirme o descarte.
 - Todo dato extraído por IA entra como *propuesta*: requiere revisión humana antes de guardarse.

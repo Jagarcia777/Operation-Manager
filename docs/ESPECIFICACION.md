@@ -5,12 +5,16 @@ la aplicación debe automatizar.
 
 ## 1. Contexto operativo
 
-- Cadena de **24 tiendas** agrupadas en **4 zonas**; cada zona tiene un gerente:
-  Milagros Velásquez, Gerardo Gómez, José Peña, José García.
-- La información entra por **cortes**: semanales y de cierre de mes.
+- **Rio Supermarket, Zona Oriente**: 6 tiendas gestionadas al detalle —Puerto Ordaz, Plaza Mayor
+  (aparece como "SUC. LECHERÍA" en algunos reportes), Maturín Tipuro, Maturín Juanico, Puente Real
+  y Valle de la Pascua.
+- La **cadena nacional** es la línea de comparación permanente. De sus otras zonas solo llega el
+  agregado, así que entran como total de zona y no se abren por sucursal.
+- La información entra por **cortes**, que son acumulados al día (por ejemplo "Acumulado al
+  23/08/2026"), no meses cerrados. De ahí que la proyección de cierre sea central.
 - La fuente actual es el **Dashboard Ejecutivo** que llega en PDF o imagen.
-- Los nombres reales de las tiendas se administran desde la app (una es "Tipuro"); el seed
-  carga marcadores editables mientras no esté el listado definitivo.
+- Una misma sucursal aparece con distintos nombres según el reporte; el catálogo guarda esos
+  alias para que la lectura automática la reconozca igual.
 
 ## 2. Módulos
 
@@ -24,7 +28,10 @@ Indicadores por tienda y corte:
 | Unidades | Meta y Real |
 | Transacciones | Meta y Real |
 | %MB | Margen bruto, Meta y Real |
-| Ticket Promedio | Derivado: Ventas $ / Transacciones |
+| RPT / Ticket promedio | Derivado: Ventas $ ÷ Transacciones |
+| UPT | Derivado: Unidades ÷ Transacciones |
+| ASP | Derivado: Ventas $ ÷ Unidades |
+| Logro | Cumplimiento acumulado contra la meta del período |
 
 - Vista agrupada por zona, con **subtotal por zona** y **total de cadena**, ambos calculados.
 - Cumplimiento = Real / Meta, por indicador, tienda, zona y cadena.
@@ -43,15 +50,17 @@ y margen), ordenado y con acumulado, para ver quién sostiene el resultado.
 
 ### 2.4 Reporte de Ajustes por Tipología
 
-Cinco tipologías, por tienda y corte, en monto y en % sobre ventas:
+Cinco tipologías, en el orden del reporte de la cadena, por tienda y corte, en monto y en % sobre
+ventas:
 
 1. Merma
 2. Mercancía Dañada
 3. Carga y Descarga
 4. Inventario
-5. Errores de Venta
+5. Ventas
 
-Agrupado por zona con subtotales, para ubicar dónde se pierde dinero y de qué forma.
+Las cifras conservan el signo de la fuente: los ajustes en contra son negativos y "Ventas" puede
+salir a favor. Agrupado por zona con subtotales, para ubicar dónde se pierde dinero y de qué forma.
 
 ### 2.5 Motor de validación y alertas
 
@@ -91,7 +100,18 @@ Se sube el Dashboard Ejecutivo (PDF o imagen) y el modelo extrae la tabla por ti
 - Se conserva el archivo de origen y la respuesta cruda para auditoría.
 - La captura manual y la importación CSV quedan disponibles como respaldo.
 
-### 2.8 Cerebro analítico — perspectiva de director de operaciones
+### 2.8 Categorías: Pareto 80/20 y BCG
+
+El resultado de una tienda no se explica en su total, sino en la mezcla. Por tienda y corte se
+registran las categorías de venta con su venta, unidades y %MB, y sobre eso:
+
+- **Ranking Pareto**: categorías ordenadas por peso en la venta, con acumulado, separando lo
+  vital (el 80%) del complemento.
+- **Clasificación BCG**: cruce del peso en venta contra el margen que aporta, en cuatro cuadrantes
+  —Estrella, Vaca Lechera, Interrogante y Perro—, que es lo que permite ver casos como una
+  categoría con mucho volumen y margen mínimo.
+
+### 2.9 Cerebro analítico — perspectiva de director de operaciones
 
 La aplicación no se limita a mostrar números: los interpreta con el criterio de un **director de
 operaciones retail** —crítico, eficiente y preciso— que domina los fundamentos clásicos del oficio

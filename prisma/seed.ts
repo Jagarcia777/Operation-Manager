@@ -14,116 +14,124 @@ const prisma = new PrismaClient({
   }),
 });
 
-const ZONAS = [
-  { nombre: "Zona Milagros Velásquez", gerente: "Milagros Velásquez", orden: 1 },
-  { nombre: "Zona Gerardo Gómez", gerente: "Gerardo Gómez", orden: 2 },
-  { nombre: "Zona José Peña", gerente: "José Peña", orden: 3 },
-  { nombre: "Zona José García", gerente: "José García", orden: 4 },
+// Zona Oriente se gestiona tienda por tienda. Los nombres son los reales de la cadena; los alias
+// recogen cómo aparece cada sucursal en otros reportes.
+const ZONA_ORIENTE = {
+  nombre: "Zona Oriente",
+  gerente: "José García",
+  orden: 1,
+  detallada: true,
+};
+
+const TIENDAS_ORIENTE = [
+  { nombre: "Puerto Ordaz", codigo: "PZO", alias: "Pto Ordaz\nPto. Ordaz" },
+  { nombre: "Plaza Mayor", codigo: "PLM", alias: "SUC. LECHERIA\nLechería" },
+  { nombre: "Maturín Tipuro", codigo: "TIP", alias: "Tipuro\nMaturin Tipuro" },
+  { nombre: "Maturín Juanico", codigo: "JUA", alias: "Juanico\nMaturin Juanico" },
+  { nombre: "Puente Real", codigo: "PRE", alias: "Pte Real" },
+  { nombre: "Valle de la Pascua", codigo: "VDLP", alias: "VDLP\nValle de la pascua" },
 ];
 
-// Catálogo provisional: 24 tiendas, 6 por zona. Los nombres se editan desde
-// Administración → Tiendas cuando esté el listado definitivo de la cadena.
-const TIENDAS_POR_ZONA = 6;
+// El resto de la cadena entra como total de zona: de esas sucursales solo llega el agregado.
+// Los nombres son provisionales hasta que se carguen los reales desde Configuración.
+const ZONAS_COMPARACION = [
+  { nombre: "Zona 2", gerente: "Por definir", orden: 2, detallada: false },
+  { nombre: "Zona 3", gerente: "Por definir", orden: 3, detallada: false },
+  { nombre: "Zona 4", gerente: "Por definir", orden: 4, detallada: false },
+  { nombre: "Zona 5", gerente: "Por definir", orden: 5, detallada: false },
+  { nombre: "Zona 6", gerente: "Por definir", orden: 6, detallada: false },
+];
 
-function nombreTienda(indice: number) {
-  return indice === 0 ? "Tipuro" : `Tienda ${String(indice + 1).padStart(2, "0")}`;
-}
+// Categorías de venta. Solo Carnicería está confirmada desde los reportes; el resto son
+// provisionales y se editan desde Configuración.
+const CATEGORIAS = [
+  "Carnicería",
+  "Charcutería",
+  "Panadería",
+  "Frutas y Verduras",
+  "Lácteos",
+  "Víveres",
+  "Bebidas",
+  "Licores",
+  "Congelados",
+  "Limpieza",
+  "Cuidado Personal",
+  "Bazar",
+  "Mascotas",
+];
 
-// Generador determinista: el seed debe producir siempre los mismos números.
+// Los cortes de la cadena son acumulados al día, no meses cerrados.
+const CORTES = [
+  {
+    nombre: "Acumulado al 12/08/2026",
+    tipo: "CIERRE_MES",
+    fechaInicio: new Date("2026-08-01"),
+    fechaFin: new Date("2026-08-12"),
+    estado: "CERRADO",
+    diasDelMes: 31,
+    diasTranscurridos: 12,
+    factor: 0.39,
+  },
+  {
+    nombre: "Acumulado al 23/08/2026",
+    tipo: "CIERRE_MES",
+    fechaInicio: new Date("2026-08-01"),
+    fechaFin: new Date("2026-08-23"),
+    estado: "REVISION",
+    diasDelMes: 31,
+    diasTranscurridos: 23,
+    factor: 0.74,
+  },
+];
+
+// Peso de cada tipología sobre ventas, en el orden del reporte. Negativos porque son ajustes
+// en contra; "Ventas" puede salir a favor.
+const PESO_TIPOLOGIA: Record<string, number> = {
+  MERMA: -1.07,
+  MERCANCIA_DANADA: -0.06,
+  CARGA_DESCARGA: -0.23,
+  INVENTARIO: -0.17,
+  VENTAS: 0.01,
+};
+
+/** Generador determinista: el seed produce siempre los mismos números. */
 function pseudoAleatorio(semilla: number) {
   const x = Math.sin(semilla * 12.9898) * 43758.5453;
   return x - Math.floor(x);
 }
 
-// Umbrales del motor de alertas. Editables después desde la app.
-const UMBRALES = [
-  {
-    clave: "CUMPLIMIENTO_MIN",
-    etiqueta: "Cumplimiento mínimo antes de sospechar del dato",
-    valor: 50,
-    unidad: "PORCENTAJE",
-    nota: "Por debajo de este cumplimiento se revisa si el dato está mal cargado.",
-  },
-  {
-    clave: "CUMPLIMIENTO_MAX",
-    etiqueta: "Cumplimiento máximo antes de sospechar del dato",
-    valor: 150,
-    unidad: "PORCENTAJE",
-    nota: "Por encima de este cumplimiento se revisa un posible Meta/Real intercambiado.",
-  },
-  {
-    clave: "AJUSTE_MAX_PCT",
-    etiqueta: "Ajuste máximo aceptable por tipología (% sobre ventas)",
-    valor: 1,
-    unidad: "PORCENTAJE",
-    nota: "Referencia del negocio para Merma, Carga y Descarga y demás tipologías.",
-  },
-  {
-    clave: "FACTOR_ATIPICO",
-    etiqueta: "Factor de desviación para marcar un valor atípico",
-    valor: 3,
-    unidad: "FACTOR",
-    nota: "Múltiplos de desviación respecto a la mediana de la cadena.",
-  },
-  {
-    clave: "SALTO_MAX_PCT",
-    etiqueta: "Variación máxima razonable contra el corte anterior",
-    valor: 40,
-    unidad: "PORCENTAJE",
-  },
-  {
-    clave: "TOLERANCIA_SUBTOTAL",
-    etiqueta: "Tolerancia al comparar un subtotal externo con la suma calculada",
-    valor: 1,
-    unidad: "USD",
-  },
-];
-
-const CORTES = [
-  {
-    nombre: "Cierre Julio 2026",
-    tipo: "CIERRE_MES",
-    fechaInicio: new Date("2026-07-01"),
-    fechaFin: new Date("2026-07-31"),
-    estado: "CERRADO",
-    diasDelMes: 31,
-    diasTranscurridos: 31,
-    factor: 0.96,
-  },
-  {
-    nombre: "Cierre Agosto 2026",
-    tipo: "CIERRE_MES",
-    fechaInicio: new Date("2026-08-01"),
-    fechaFin: new Date("2026-08-31"),
-    estado: "REVISION",
-    diasDelMes: 31,
-    diasTranscurridos: 31,
-    factor: 1,
-  },
-];
-
 async function main() {
-  const zonas = [];
-  for (const zona of ZONAS) {
-    zonas.push(
-      await prisma.zona.upsert({
-        where: { nombre: zona.nombre },
-        update: { gerente: zona.gerente, orden: zona.orden },
-        create: zona,
-      }),
+  const oriente = await prisma.zona.upsert({
+    where: { nombre: ZONA_ORIENTE.nombre },
+    update: ZONA_ORIENTE,
+    create: ZONA_ORIENTE,
+  });
+
+  const zonasComparacion = [];
+  for (const zona of ZONAS_COMPARACION) {
+    zonasComparacion.push(
+      await prisma.zona.upsert({ where: { nombre: zona.nombre }, update: zona, create: zona }),
     );
   }
 
   const tiendas = [];
-  for (let i = 0; i < zonas.length * TIENDAS_POR_ZONA; i++) {
-    const zona = zonas[Math.floor(i / TIENDAS_POR_ZONA)];
-    const nombre = nombreTienda(i);
-    const codigo = `T${String(i + 1).padStart(2, "0")}`;
+  for (const [indice, tienda] of TIENDAS_ORIENTE.entries()) {
     tiendas.push(
       await prisma.tienda.upsert({
+        where: { nombre: tienda.nombre },
+        update: { ...tienda, zonaId: oriente.id, orden: indice + 1 },
+        create: { ...tienda, zonaId: oriente.id, orden: indice + 1 },
+      }),
+    );
+  }
+
+  const categorias = [];
+  for (const [indice, nombre] of CATEGORIAS.entries()) {
+    categorias.push(
+      await prisma.categoria.upsert({
         where: { nombre },
-        update: { zonaId: zona.id, codigo, orden: i + 1 },
-        create: { nombre, codigo, zonaId: zona.id, orden: i + 1 },
+        update: { orden: indice + 1 },
+        create: { nombre, orden: indice + 1 },
       }),
     );
   }
@@ -136,15 +144,18 @@ async function main() {
       create: datos,
     });
 
+    // Zona Oriente, tienda por tienda.
     for (const [i, tienda] of tiendas.entries()) {
-      const base = 180_000 + pseudoAleatorio(i + 1) * 240_000;
-      const ventasMeta = Math.round((base * factor) / 100) * 100;
-      const cumplimiento = 0.82 + pseudoAleatorio(i + 11) * 0.35;
-      const ventasReal = Math.round((ventasMeta * cumplimiento) / 100) * 100;
-      const ticket = 26 + pseudoAleatorio(i + 21) * 14;
-      const transaccionesReal = Math.round(ventasReal / ticket);
-      const unidadesReal = Math.round(transaccionesReal * (1.8 + pseudoAleatorio(i + 31) * 1.1));
-      const margenBrutoReal = Number((26 + pseudoAleatorio(i + 41) * 8).toFixed(2));
+      const ventaMensual = 1_900_000 + pseudoAleatorio(i + 1) * 2_600_000;
+      const ventasMeta = Math.round((ventaMensual * factor) / 100) * 100;
+      const logro = 0.86 + pseudoAleatorio(i + 11) * 0.26;
+      const ventasReal = Math.round((ventasMeta * logro) / 100) * 100;
+      const rpt = 24 + pseudoAleatorio(i + 21) * 16;
+      const transaccionesReal = Math.round(ventasReal / rpt);
+      const unidadesReal = Math.round(transaccionesReal * (2.1 + pseudoAleatorio(i + 31) * 1.4));
+      // El margen de supermercado se mueve en la franja baja; el reporte real marcó en rojo
+      // las tiendas por debajo de 16%.
+      const margenBrutoReal = Number((15 + pseudoAleatorio(i + 41) * 9).toFixed(2));
 
       await prisma.registroVentas.upsert({
         where: { corteId_tiendaId: { corteId: corte.id, tiendaId: tienda.id } },
@@ -154,25 +165,25 @@ async function main() {
           tiendaId: tienda.id,
           ventasMeta,
           ventasReal,
-          unidadesMeta: Math.round(unidadesReal / cumplimiento),
+          unidadesMeta: Math.round(unidadesReal / logro),
           unidadesReal,
-          transaccionesMeta: Math.round(transaccionesReal / cumplimiento),
+          transaccionesMeta: Math.round(transaccionesReal / logro),
           transaccionesReal,
-          margenBrutoMeta: 30,
+          margenBrutoMeta: 22,
           margenBrutoReal,
         },
       });
 
       for (const [j, tipologia] of TIPOLOGIAS.entries()) {
-        // Caso real reportado por el negocio: Carga y Descarga muy por encima del rango
-        // típico en Tipuro. Se siembra para que el motor de alertas tenga qué detectar.
+        // Caso real del negocio: Carga y Descarga muy por encima del rango en Tipuro.
         const esAtipico =
-          tienda.nombre === "Tipuro" &&
+          tienda.codigo === "TIP" &&
           tipologia === "CARGA_DESCARGA" &&
-          corte.nombre === "Cierre Agosto 2026";
+          corte.nombre === "Acumulado al 23/08/2026";
+        const base = PESO_TIPOLOGIA[tipologia];
         const porcentaje = esAtipico
-          ? 2.38
-          : Number((0.04 + pseudoAleatorio(i * 7 + j + 51) * 0.42).toFixed(2));
+          ? -2.38
+          : Number((base * (0.6 + pseudoAleatorio(i * 7 + j + 51) * 0.9)).toFixed(2));
 
         await prisma.registroAjuste.upsert({
           where: {
@@ -192,42 +203,155 @@ async function main() {
           },
         });
       }
+
+      // Detalle por categoría: la venta de la tienda repartida con pesos decrecientes.
+      const pesos = categorias.map((_, indice) => 1 / (indice + 1.35));
+      const sumaPesos = pesos.reduce((total, peso) => total + peso, 0);
+      for (const [k, categoria] of categorias.entries()) {
+        const ventaCategoria = Math.round((ventasReal * pesos[k]) / sumaPesos);
+        // Carnicería es alta en venta y muy baja en margen: el caso que el negocio ya detectó.
+        const margen =
+          categoria.nombre === "Carnicería"
+            ? Number((3 + pseudoAleatorio(i * 13 + k) * 2).toFixed(2))
+            : Number((10 + pseudoAleatorio(i * 13 + k + 61) * 22).toFixed(2));
+
+        await prisma.registroCategoria.upsert({
+          where: {
+            corteId_tiendaId_categoriaId: {
+              corteId: corte.id,
+              tiendaId: tienda.id,
+              categoriaId: categoria.id,
+            },
+          },
+          update: {},
+          create: {
+            corteId: corte.id,
+            tiendaId: tienda.id,
+            categoriaId: categoria.id,
+            ventasReal: ventaCategoria,
+            unidadesReal: Math.round(ventaCategoria / (6 + pseudoAleatorio(k + 71) * 10)),
+            margenBrutoReal: margen,
+          },
+        });
+      }
+    }
+
+    // Resto de la cadena: solo el agregado de cada zona.
+    for (const [i, zona] of zonasComparacion.entries()) {
+      const ventaMensual = 5_000_000 + pseudoAleatorio(i + 101) * 6_000_000;
+      const ventasMeta = Math.round((ventaMensual * factor) / 100) * 100;
+      const logro = 0.9 + pseudoAleatorio(i + 111) * 0.18;
+      const ventasReal = Math.round((ventasMeta * logro) / 100) * 100;
+      const rpt = 26 + pseudoAleatorio(i + 121) * 12;
+      const transaccionesReal = Math.round(ventasReal / rpt);
+
+      await prisma.registroZona.upsert({
+        where: { corteId_zonaId: { corteId: corte.id, zonaId: zona.id } },
+        update: {},
+        create: {
+          corteId: corte.id,
+          zonaId: zona.id,
+          ventasMeta,
+          ventasReal,
+          unidadesMeta: Math.round(transaccionesReal * 2.4),
+          unidadesReal: Math.round(transaccionesReal * 2.3),
+          transaccionesMeta: Math.round(transaccionesReal / logro),
+          transaccionesReal,
+          margenBrutoMeta: 22,
+          margenBrutoReal: Number((16 + pseudoAleatorio(i + 131) * 7).toFixed(2)),
+        },
+      });
     }
   }
 
-  for (const umbral of UMBRALES) {
-    await prisma.umbral.upsert({
-      where: { clave: umbral.clave },
-      update: { etiqueta: umbral.etiqueta, unidad: umbral.unidad, nota: umbral.nota },
-      create: umbral,
-    });
-  }
+  const umbrales = await prisma.umbral.count();
+  if (umbrales === 0) await sembrarUmbrales();
 
-  // Usuario maestro único de la aplicación.
-  const zonaPropia = zonas.find((zona) => zona.gerente === "José García");
   await prisma.perfil.upsert({
     where: { id: "maestro" },
-    update: { zonaPropiaId: zonaPropia?.id },
+    update: { zonaPropiaId: oriente.id },
     create: {
       id: "maestro",
       nombre: "José García",
       cargo: "Director de Operaciones",
-      zonaPropiaId: zonaPropia?.id,
+      zonaPropiaId: oriente.id,
       contexto:
-        "Mantengo el Tablero de Control de Ventas y el Reporte de Ajustes por Tipología corte a " +
-        "corte, detecto inconsistencias en la data fuente y convierto los números en " +
-        "presentaciones de tienda, informes ejecutivos y planes de acción para gerencia.",
+        "Gestiono las 6 tiendas de Zona Oriente de Rio Supermarket y las comparo contra la " +
+        "cadena nacional. Mantengo el Tablero de Control de Ventas y el Reporte de Ajustes por " +
+        "Tipología corte a corte, detecto inconsistencias en la data fuente y convierto los " +
+        "números en presentaciones de tienda, informes ejecutivos y planes de acción.",
       instruccionesCerebro:
         "Analiza con criterio de director de operaciones retail: crítico, preciso y orientado a " +
-        "ejecución en tienda. Prioriza por $ de oportunidad, separa causa raíz de síntoma y di " +
-        "explícitamente qué no se puede concluir con los datos disponibles.",
+        "ejecución en tienda. Usa benchmarks internacionales de supermercado (NRF/IGD), prioriza " +
+        "por $ de oportunidad, separa causa raíz de síntoma y di explícitamente qué no se puede " +
+        "concluir con los datos disponibles.",
     },
   });
 
   console.log(
-    `Seed listo: ${zonas.length} zonas, ${tiendas.length} tiendas, ${CORTES.length} cortes, ` +
-      `${UMBRALES.length} umbrales y el perfil maestro.`,
+    `Seed listo: Zona Oriente con ${tiendas.length} tiendas, ${zonasComparacion.length} zonas de ` +
+      `comparación, ${categorias.length} categorías y ${CORTES.length} cortes.`,
   );
+}
+
+async function sembrarUmbrales() {
+  const umbrales = [
+    {
+      clave: "CUMPLIMIENTO_MIN",
+      etiqueta: "Cumplimiento mínimo antes de sospechar del dato",
+      valor: 50,
+      unidad: "PORCENTAJE",
+      nota: "Por debajo de este logro se revisa si el dato está mal cargado.",
+    },
+    {
+      clave: "CUMPLIMIENTO_MAX",
+      etiqueta: "Cumplimiento máximo antes de sospechar del dato",
+      valor: 150,
+      unidad: "PORCENTAJE",
+      nota: "Por encima de este logro se revisa un posible Meta/Real intercambiado.",
+    },
+    {
+      clave: "AJUSTE_MAX_PCT",
+      etiqueta: "Ajuste máximo aceptable por tipología (% sobre ventas)",
+      valor: 1.2,
+      unidad: "PORCENTAJE",
+      nota: "Referencia del negocio para Merma, Carga y Descarga y demás tipologías.",
+    },
+    {
+      clave: "FACTOR_ATIPICO",
+      etiqueta: "Factor de desviación para marcar un valor atípico",
+      valor: 3,
+      unidad: "FACTOR",
+      nota: "Múltiplos de desviación respecto a la mediana de la cadena.",
+    },
+    {
+      clave: "SALTO_MAX_PCT",
+      etiqueta: "Variación máxima razonable contra el corte anterior",
+      valor: 40,
+      unidad: "PORCENTAJE",
+    },
+    {
+      clave: "TOLERANCIA_SUBTOTAL",
+      etiqueta: "Tolerancia al comparar un subtotal externo con la suma calculada",
+      valor: 1,
+      unidad: "USD",
+    },
+    {
+      clave: "MARGEN_MIN_PCT",
+      etiqueta: "Margen bruto mínimo aceptable de una tienda",
+      valor: 16,
+      unidad: "PORCENTAJE",
+      nota: "Por debajo de este %MB la tienda entra en alerta roja.",
+    },
+  ];
+
+  for (const umbral of umbrales) {
+    await prisma.umbral.upsert({
+      where: { clave: umbral.clave },
+      update: {},
+      create: umbral,
+    });
+  }
 }
 
 main()

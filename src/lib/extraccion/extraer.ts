@@ -88,7 +88,7 @@ export async function extraerAjustes(archivo: ArchivoEntrada): Promise<Extraccio
   return pedirExtraccion<ExtraccionAjustesTipo>(
     archivo,
     REGLAS_COMUNES,
-    `Este documento es un reporte de ajustes por tipología. Extrae una fila por tienda con Merma, Mercancía Dañada, Carga y Descarga, Inventario y Errores de Venta, e indica en "unidad" si las cifras impresas son montos en $ o porcentajes sobre ventas.`,
+    `Este documento es un reporte de ajustes por tipología de una cadena de supermercados. Extrae una fila por sucursal con las cinco tipologías —Merma, Mercancía Dañada, Carga y Descarga, Inventario y Ventas— respetando el signo tal como aparece impreso: los ajustes en contra van en negativo. Las filas de zona y el total de cadena son subtotales, no sucursales. Indica en "unidad" si las cifras son montos en $ o porcentajes sobre ventas.`,
     zodOutputFormat(ExtraccionAjustes),
   );
 }

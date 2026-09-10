@@ -35,12 +35,12 @@ export const ExtraccionVentas = z.object({
 });
 
 export const FilaAjusteExtraida = z.object({
-  tienda: z.string(),
+  tienda: z.string().describe("Sucursal o zona tal como aparece impresa"),
   merma: z.number().nullable(),
   mercanciaDanada: z.number().nullable(),
   cargaYDescarga: z.number().nullable(),
   inventario: z.number().nullable(),
-  erroresDeVenta: z.number().nullable(),
+  ventas: z.number().nullable().describe("Tipología 'Ventas', la quinta columna del reporte"),
 });
 
 export const ExtraccionAjustes = z.object({
