@@ -8,6 +8,7 @@ import {
   cambiarEstadoCorte,
   crearCorte,
   eliminarCorte,
+  guardarBenchmark,
   guardarPerfil,
   guardarTienda,
   guardarUmbral,
@@ -19,6 +20,7 @@ const SECCIONES = [
   { clave: "catalogo", etiqueta: "Zonas y tiendas" },
   { clave: "cortes", etiqueta: "Cortes" },
   { clave: "umbrales", etiqueta: "Umbrales de alerta" },
+  { clave: "benchmarks", etiqueta: "Benchmarks" },
   { clave: "memoria", etiqueta: "Memoria operativa" },
 ];
 
@@ -51,8 +53,11 @@ export default async function ConfiguracionPage({ searchParams }: PageProps<"/co
       {seccion === "catalogo" && <SeccionCatalogo />}
       {seccion === "cortes" && <SeccionCortes />}
       {seccion === "umbrales" && <SeccionUmbrales />}
+      {seccion === "benchmarks" && <SeccionBenchmarks />}
       {seccion === "memoria" && <SeccionMemoria />}
-      {!["catalogo", "cortes", "umbrales", "memoria"].includes(seccion) && <SeccionPerfil />}
+      {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria"].includes(seccion) && (
+        <SeccionPerfil />
+      )}
     </div>
   );
 }
@@ -377,6 +382,55 @@ async function SeccionUmbrales() {
           </div>
         </form>
       ))}
+    </div>
+  );
+}
+
+async function SeccionBenchmarks() {
+  const benchmarks = await prisma.benchmark.findMany({ orderBy: { etiqueta: "asc" } });
+
+  return (
+    <div className="space-y-3">
+      <p className="max-w-2xl text-sm text-texto-2">
+        Referencias externas contra las que se mide la operación en el informe ejecutivo. La
+        aplicación no las inventa: carga aquí los valores que uses, sean de NRF, IGD o de criterio
+        interno. Lo que dejes vacío sale como &laquo;sin referencia&raquo; en el informe.
+      </p>
+
+      <div className="tarjeta divide-y divide-borde-suave">
+        {benchmarks.map((benchmark) => (
+          <form
+            key={benchmark.id}
+            action={guardarBenchmark}
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+          >
+            <input type="hidden" name="id" value={benchmark.id} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{benchmark.etiqueta}</p>
+              <p className="text-xs text-texto-3">{benchmark.unidad}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                name="valor"
+                type="number"
+                step="any"
+                defaultValue={benchmark.valor ?? ""}
+                placeholder="Sin cargar"
+                className="campo w-28 text-right"
+              />
+              <input
+                name="fuente"
+                defaultValue={benchmark.fuente}
+                className="campo w-28"
+                placeholder="Fuente"
+              />
+              <button type="submit" className="boton boton-secundario">
+                Guardar
+              </button>
+            </div>
+          </form>
+        ))}
+      </div>
     </div>
   );
 }

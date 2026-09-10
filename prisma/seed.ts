@@ -266,6 +266,7 @@ async function main() {
 
   const umbrales = await prisma.umbral.count();
   if (umbrales === 0) await sembrarUmbrales();
+  await sembrarBenchmarks();
 
   await prisma.perfil.upsert({
     where: { id: "maestro" },
@@ -350,6 +351,34 @@ async function sembrarUmbrales() {
       where: { clave: umbral.clave },
       update: {},
       create: umbral,
+    });
+  }
+}
+
+/**
+ * Los benchmarks se crean sin valor a propósito: son referencias del negocio y las carga el
+ * usuario desde Configuración. La aplicación no se inventa un estándar internacional.
+ */
+async function sembrarBenchmarks() {
+  const benchmarks = [
+    { clave: "MB_PCT", etiqueta: "Margen bruto", unidad: "PORCENTAJE", fuente: "NRF/IGD" },
+    { clave: "UPT", etiqueta: "Unidades por transacción", unidad: "FACTOR", fuente: "NRF/IGD" },
+    { clave: "RPT", etiqueta: "Ticket promedio (RPT)", unidad: "USD", fuente: "NRF/IGD" },
+    { clave: "ASP", etiqueta: "Precio medio por unidad (ASP)", unidad: "USD", fuente: "NRF/IGD" },
+    { clave: "MERMA_PCT", etiqueta: "Merma sobre ventas", unidad: "PORCENTAJE", fuente: "NRF/IGD" },
+    {
+      clave: "AJUSTES_PCT",
+      etiqueta: "Ajustes totales sobre ventas",
+      unidad: "PORCENTAJE",
+      fuente: "Interno",
+    },
+  ];
+
+  for (const benchmark of benchmarks) {
+    await prisma.benchmark.upsert({
+      where: { clave: benchmark.clave },
+      update: {},
+      create: { ...benchmark, nota: "Cargar el valor de referencia en Configuración." },
     });
   }
 }

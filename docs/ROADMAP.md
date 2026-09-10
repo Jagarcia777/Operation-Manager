@@ -51,9 +51,13 @@ si algo queda a medias.
 ## Fase 6 — Documentos de decisión
 
 - [x] Planes de acción (cadena / zona / tienda) con metas, cronograma a 3 meses y $ oportunidad
-- [x] Presentación de tienda (vista + impresión a PDF)
-- [x] Informe ejecutivo (vista + impresión a PDF)
-- [x] Exportación a PowerPoint (.pptx) y Word (.docx)
+- [x] Informe ejecutivo con la estructura real: indicadores contra cadena y benchmark, scorecard
+      por tienda con fortalezas y alertas, tendencia por ritmo diario, categorías, Balanced
+      Scorecard, escenarios de cierre, ajustes y conclusiones
+- [x] Benchmarks cargables desde Configuración (la app no inventa referencias)
+- [x] Exportación del informe ejecutivo a PowerPoint (.pptx) y Word (.docx)
+- [ ] Presentación de tienda con sus 7 secciones (hoy tiene la versión anterior, más pobre)
+- [ ] Venta diaria para el análisis por día de la semana
 
 ## Fase 7 — Cierre
 

@@ -276,6 +276,20 @@ model Umbral {
   editado  DateTime @updatedAt
 }
 
+// Referencias externas contra las que se mide la operación (NRF, IGD, criterio interno).
+// Se cargan desde Configuración: la app no inventa un benchmark que no le hayan dado.
+model Benchmark {
+  id       String  @id @default(cuid())
+  clave    String  @unique
+  etiqueta String
+  valor    Float?
+  unidad   String  @default("PORCENTAJE") // PORCENTAJE | USD | FACTOR
+  fuente   String  @default("Interno")
+  nota     String?
+
+  editado DateTime @updatedAt
+}
+
 // Usuario maestro único: la app se ajusta a su forma de trabajar. Una sola fila, id "maestro".
 model Perfil {
   id           String  @id @default("maestro")

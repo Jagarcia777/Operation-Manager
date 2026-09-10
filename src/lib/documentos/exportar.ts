@@ -12,9 +12,11 @@ import {
   WidthType,
 } from "docx";
 import PptxGenJS from "pptxgenjs";
-import { ETIQUETA_TIPOLOGIA, TIPOLOGIAS } from "@/lib/dominio";
+import { analizarCategorias, consolidarCategorias } from "@/lib/categorias";
+import { ETIQUETA_BCG, ETIQUETA_TIPOLOGIA, TIPOLOGIAS } from "@/lib/dominio";
 import { moneda, numero, porcentaje, variacion } from "@/lib/formato";
 import type { DatosInforme, DatosPresentacion } from "./datos";
+import { ETIQUETA_VIABILIDAD, escenariosCierre } from "./indicadores";
 
 const TINTA = "1D1D1F";
 const GRIS = "6E6E73";
@@ -165,66 +167,98 @@ export async function pptxPresentacionTienda(datos: DatosPresentacion): Promise<
 }
 
 export async function pptxInformeEjecutivo(datos: DatosInforme): Promise<Buffer> {
-  const { corte, tablero, ajustes, analisis } = datos;
-  const pptx = nuevaPresentacion(`Informe ejecutivo · ${corte.nombre}`);
+  const { corte, tablero, analisis, zonaPropia } = datos;
+  if (!zonaPropia) throw new Error("No hay una zona gestionada al detalle.");
 
-  portada(pptx, "Informe ejecutivo", corte.nombre);
+  const zona = zonaPropia.subtotal;
+  const cadena = tablero.total;
+  const pptx = nuevaPresentacion(`${zonaPropia.zona} · ${corte.nombre}`);
 
-  laminaIndicadores(pptx, "Resultado de la cadena", [
+  portada(pptx, zonaPropia.zona, `Informe ejecutivo · ${corte.nombre}`);
+
+  laminaIndicadores(pptx, "Resultado del corte", [
+    { etiqueta: "Ventas", valor: moneda(zona.ventasReal), detalle: `Meta ${moneda(zona.ventasMeta)}` },
     {
-      etiqueta: "Ventas",
-      valor: moneda(tablero.total.ventasReal),
-      detalle: `Meta ${moneda(tablero.total.ventasMeta)}`,
+      etiqueta: "Logro",
+      valor: porcentaje(zona.cumplimientoVentas),
+      detalle: `Cadena ${porcentaje(cadena.cumplimientoVentas)}`,
     },
     {
-      etiqueta: "Cumplimiento",
-      valor: porcentaje(tablero.total.cumplimientoVentas),
-      detalle: `Brecha ${moneda(tablero.total.brechaVentas)}`,
+      etiqueta: "RPT",
+      valor: moneda(zona.ticketPromedio, true),
+      detalle: `Cadena ${moneda(cadena.ticketPromedio, true)}`,
     },
+    { etiqueta: "UPT", valor: numero(zona.upt, 2), detalle: `Cadena ${numero(cadena.upt, 2)}` },
     {
-      etiqueta: "Margen bruto",
-      valor: porcentaje(tablero.total.margenBrutoReal),
-      detalle: moneda(tablero.total.margenBrutoUsd),
+      etiqueta: "%MB",
+      valor: porcentaje(zona.margenBrutoReal),
+      detalle: `Cadena ${porcentaje(cadena.margenBrutoReal)}`,
     },
     {
       etiqueta: "Ajustes",
-      valor: moneda(ajustes.total.totalMonto),
-      detalle: `${porcentaje(ajustes.total.totalPorcentaje, 2)} de ventas`,
+      valor: porcentaje(datos.ajustesZona?.subtotal.totalPorcentaje ?? null, 2),
+      detalle: moneda(datos.ajustesZona?.subtotal.totalMonto ?? null),
     },
   ]);
 
-  laminaTabla(pptx, "Comparativo por zona", [
-    ["Zona", "Meta", "Ventas", "Cumpl.", "%MB"],
-    ...tablero.zonas.map((zona) => [
-      zona.zona,
-      moneda(zona.subtotal.ventasMeta),
-      moneda(zona.subtotal.ventasReal),
-      porcentaje(zona.subtotal.cumplimientoVentas),
-      porcentaje(zona.subtotal.margenBrutoReal),
+  laminaTabla(pptx, "Scorecard por tienda", [
+    ["Tienda", "Ventas", "Logro", "Brecha", "RPT", "%MB"],
+    ...zonaPropia.tiendas.map((tienda) => [
+      tienda.tienda,
+      moneda(tienda.ventasReal),
+      porcentaje(tienda.cumplimientoVentas),
+      moneda(tienda.brechaVentas),
+      moneda(tienda.ticketPromedio, true),
+      porcentaje(tienda.margenBrutoReal),
     ]),
     [
-      "Total cadena",
-      moneda(tablero.total.ventasMeta),
-      moneda(tablero.total.ventasReal),
-      porcentaje(tablero.total.cumplimientoVentas),
-      porcentaje(tablero.total.margenBrutoReal),
+      zonaPropia.zona,
+      moneda(zona.ventasReal),
+      porcentaje(zona.cumplimientoVentas),
+      moneda(zona.brechaVentas),
+      moneda(zona.ticketPromedio, true),
+      porcentaje(zona.margenBrutoReal),
     ],
   ]);
 
-  laminaTabla(pptx, "Pérdidas por tipología", [
+  const mezcla = analizarCategorias(consolidarCategorias(datos.categorias));
+  if (mezcla.filas.length) {
+    laminaTabla(pptx, "Categorías: Pareto y BCG", [
+      ["Categoría", "Venta", "Peso", "%MB", "BCG"],
+      ...mezcla.filas
+        .slice(0, 8)
+        .map((fila) => [
+          fila.categoria,
+          moneda(fila.ventasReal),
+          porcentaje(fila.pesoVenta),
+          porcentaje(fila.margenBrutoReal),
+          ETIQUETA_BCG[fila.claseBcg],
+        ]),
+    ]);
+  }
+
+  laminaTabla(pptx, "Proyección de cierre", [
+    ["Tienda", "Meta", "Conservador", "Base", "Optimista", "Viabilidad"],
+    ...zonaPropia.tiendas.map((tienda) => {
+      const escenario = escenariosCierre(tienda, corte);
+      return [
+        tienda.tienda,
+        moneda(escenario.meta),
+        moneda(escenario.conservador),
+        moneda(escenario.base),
+        moneda(escenario.optimista),
+        escenario.viabilidad ? ETIQUETA_VIABILIDAD[escenario.viabilidad] : "—",
+      ];
+    }),
+  ]);
+
+  laminaTabla(pptx, "Ajustes por tipología", [
     ["Tipología", "Monto", "% sobre ventas"],
     ...TIPOLOGIAS.map((tipologia) => [
       ETIQUETA_TIPOLOGIA[tipologia],
-      moneda(ajustes.total.montos[tipologia]),
-      porcentaje(ajustes.total.porcentajes[tipologia], 2),
+      moneda(datos.ajustesZona?.subtotal.montos[tipologia] ?? null),
+      porcentaje(datos.ajustesZona?.subtotal.porcentajes[tipologia] ?? null, 2),
     ]),
-  ]);
-
-  laminaLista(pptx, "Las que restan", [
-    ...datos.rezagadas.map(
-      (tienda) =>
-        `${tienda.tienda} (${tienda.zona}): ${porcentaje(tienda.cumplimientoVentas)} · ${moneda(tienda.brechaVentas)}`,
-    ),
   ]);
 
   if (analisis) {
@@ -242,6 +276,14 @@ export async function pptxInformeEjecutivo(datos: DatosInforme): Promise<Buffer>
         recomendacion.plazo,
       ]),
     ]);
+  }
+
+  if (datos.alertas.length) {
+    laminaLista(
+      pptx,
+      "Salvedades sobre la data",
+      datos.alertas.map((alerta) => alerta.mensaje),
+    );
   }
 
   return aBuffer(pptx);
@@ -361,12 +403,16 @@ export async function docxPresentacionTienda(datos: DatosPresentacion): Promise<
 }
 
 export async function docxInformeEjecutivo(datos: DatosInforme): Promise<Buffer> {
-  const { corte, tablero, ajustes, analisis } = datos;
+  const { corte, tablero, analisis, zonaPropia } = datos;
+  if (!zonaPropia) throw new Error("No hay una zona gestionada al detalle.");
+
+  const zona = zonaPropia.subtotal;
+  const cadena = tablero.total;
 
   const contenido: (Paragraph | Table)[] = [
-    new Paragraph({ text: `Informe ejecutivo · ${corte.nombre}`, heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ text: `${zonaPropia.zona} · Informe ejecutivo`, heading: HeadingLevel.HEADING_1 }),
     parrafo(
-      `Cierre de ${tablero.zonas.length} zonas y ${tablero.zonas.reduce((total, zona) => total + zona.tiendas.length, 0)} tiendas.`,
+      `${corte.nombre} · ${zonaPropia.tiendas.length} tiendas · ${zonaPropia.gerente}`,
       { gris: true },
     ),
   ];
@@ -379,48 +425,91 @@ export async function docxInformeEjecutivo(datos: DatosInforme): Promise<Buffer>
   }
 
   contenido.push(
-    new Paragraph({ text: "Comparativo por zona", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ text: "Tablero de indicadores", heading: HeadingLevel.HEADING_2 }),
     tablaDocx([
-      ["Zona", "Gerente", "Meta", "Ventas", "Cumpl.", "%MB"],
-      ...tablero.zonas.map((zona) => [
-        zona.zona,
-        zona.gerente,
-        moneda(zona.subtotal.ventasMeta),
-        moneda(zona.subtotal.ventasReal),
-        porcentaje(zona.subtotal.cumplimientoVentas),
-        porcentaje(zona.subtotal.margenBrutoReal),
+      ["Indicador", zonaPropia.zona, "Cadena"],
+      ["Ventas", moneda(zona.ventasReal), moneda(cadena.ventasReal)],
+      [
+        "Logro contra meta",
+        porcentaje(zona.cumplimientoVentas),
+        porcentaje(cadena.cumplimientoVentas),
+      ],
+      ["Margen bruto", porcentaje(zona.margenBrutoReal), porcentaje(cadena.margenBrutoReal)],
+      [
+        "RPT (ticket promedio)",
+        moneda(zona.ticketPromedio, true),
+        moneda(cadena.ticketPromedio, true),
+      ],
+      ["UPT", numero(zona.upt, 2), numero(cadena.upt, 2)],
+      ["Transacciones", numero(zona.transaccionesReal), numero(cadena.transaccionesReal)],
+    ]),
+
+    new Paragraph({ text: "Scorecard por tienda", heading: HeadingLevel.HEADING_2 }),
+    tablaDocx([
+      ["Tienda", "Ventas", "Logro", "Brecha", "RPT", "%MB"],
+      ...zonaPropia.tiendas.map((tienda) => [
+        tienda.tienda,
+        moneda(tienda.ventasReal),
+        porcentaje(tienda.cumplimientoVentas),
+        moneda(tienda.brechaVentas),
+        moneda(tienda.ticketPromedio, true),
+        porcentaje(tienda.margenBrutoReal),
       ]),
       [
-        "Total cadena",
-        "",
-        moneda(tablero.total.ventasMeta),
-        moneda(tablero.total.ventasReal),
-        porcentaje(tablero.total.cumplimientoVentas),
-        porcentaje(tablero.total.margenBrutoReal),
+        zonaPropia.zona,
+        moneda(zona.ventasReal),
+        porcentaje(zona.cumplimientoVentas),
+        moneda(zona.brechaVentas),
+        moneda(zona.ticketPromedio, true),
+        porcentaje(zona.margenBrutoReal),
       ],
     ]),
 
-    new Paragraph({ text: "Pérdidas por tipología", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ text: "Proyección de cierre", heading: HeadingLevel.HEADING_2 }),
+    tablaDocx([
+      ["Tienda", "Meta", "Conservador", "Base", "Optimista", "Viabilidad"],
+      ...zonaPropia.tiendas.map((tienda) => {
+        const escenario = escenariosCierre(tienda, corte);
+        return [
+          tienda.tienda,
+          moneda(escenario.meta),
+          moneda(escenario.conservador),
+          moneda(escenario.base),
+          moneda(escenario.optimista),
+          escenario.viabilidad ? ETIQUETA_VIABILIDAD[escenario.viabilidad] : "—",
+        ];
+      }),
+    ]),
+
+    new Paragraph({ text: "Ajustes por tipología", heading: HeadingLevel.HEADING_2 }),
     tablaDocx([
       ["Tipología", "Monto", "% sobre ventas"],
       ...TIPOLOGIAS.map((tipologia) => [
         ETIQUETA_TIPOLOGIA[tipologia],
-        moneda(ajustes.total.montos[tipologia]),
-        porcentaje(ajustes.total.porcentajes[tipologia], 2),
-      ]),
-    ]),
-
-    new Paragraph({ text: "Tiendas rezagadas", heading: HeadingLevel.HEADING_2 }),
-    tablaDocx([
-      ["Tienda", "Zona", "Cumplimiento", "Brecha"],
-      ...datos.rezagadas.map((tienda) => [
-        tienda.tienda,
-        tienda.zona,
-        porcentaje(tienda.cumplimientoVentas),
-        moneda(tienda.brechaVentas),
+        moneda(datos.ajustesZona?.subtotal.montos[tipologia] ?? null),
+        porcentaje(datos.ajustesZona?.subtotal.porcentajes[tipologia] ?? null, 2),
       ]),
     ]),
   );
+
+  const mezcla = analizarCategorias(consolidarCategorias(datos.categorias));
+  if (mezcla.filas.length) {
+    contenido.push(
+      new Paragraph({ text: "Categorías: Pareto y BCG", heading: HeadingLevel.HEADING_2 }),
+      tablaDocx([
+        ["Categoría", "Venta", "Peso", "%MB", "BCG"],
+        ...mezcla.filas
+          .slice(0, 10)
+          .map((fila) => [
+            fila.categoria,
+            moneda(fila.ventasReal),
+            porcentaje(fila.pesoVenta),
+            porcentaje(fila.margenBrutoReal),
+            ETIQUETA_BCG[fila.claseBcg],
+          ]),
+      ]),
+    );
+  }
 
   if (analisis) {
     contenido.push(

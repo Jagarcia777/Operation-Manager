@@ -133,6 +133,20 @@ export async function guardarUmbral(formData: FormData) {
   refrescar();
 }
 
+export async function guardarBenchmark(formData: FormData) {
+  const id = texto(formData, "id");
+  if (!id) return;
+  await prisma.benchmark.update({
+    where: { id },
+    data: {
+      valor: numero(formData, "valor"),
+      fuente: texto(formData, "fuente") ?? "Interno",
+    },
+  });
+  refrescar();
+  revalidatePath("/documentos/ejecutivo");
+}
+
 export async function agregarNota(formData: FormData) {
   const contenido = texto(formData, "texto");
   if (!contenido) return;
