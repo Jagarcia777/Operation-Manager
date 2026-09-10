@@ -177,7 +177,9 @@ no delega sus datos a servicios de terceros.
 - **Solo escucha en localhost**: `npm run dev` y `npm start` se atan a `127.0.0.1`, de modo que la
   app no queda expuesta a la red local.
 - **Sin recursos de terceros**: tipografías del sistema, nada de CDN ni fuentes remotas, y una
-  política de contenido (CSP) que restringe la app a su propio origen. Sin analítica ni telemetría.
+  política de contenido (CSP) que restringe la app a su propio origen. Sin analítica. La telemetría
+  anónima que Next.js trae activada de fábrica se desactiva sola al instalar (`postinstall`), para
+  que la promesa no dependa de acordarse de un comando.
 - **La única salida a internet es la IA, y es explícita**: la extracción del PDF/imagen y la
   asesoría del cerebro analítico usan la API de Anthropic con la clave del propio usuario, por
   TLS. Se envía únicamente el archivo a leer o las métricas ya calculadas del corte —nunca la base

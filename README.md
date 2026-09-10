@@ -6,7 +6,8 @@ lee los números de cada corte, los valida, marca las inconsistencias y arma los
 decisión para las reuniones de gerencia.
 
 La aplicación corre **en tu equipo**: la base de datos es un archivo local, el servidor solo
-escucha en `127.0.0.1` y no hay cuentas ni sincronización a la nube.
+escucha en `127.0.0.1` y no hay cuentas ni sincronización a la nube. La telemetría anónima que
+Next.js trae activada de fábrica se desactiva sola durante `npm install`.
 
 ## Instalación
 
