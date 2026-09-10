@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
+import { Pestanas } from "@/components/Pestanas";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TablaZonas, type ColumnaTabla } from "@/components/TablaZonas";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
@@ -84,21 +84,13 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
         />
       </section>
 
-      <nav className="no-imprimir flex gap-1 border-b border-borde-suave">
-        {VISTAS.map((opcion) => (
-          <Link
-            key={opcion.clave}
-            href={`/tablero?corte=${corte.id}&vista=${opcion.clave}`}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors duration-200 ${
-              vista === opcion.clave
-                ? "border-acento font-medium text-acento"
-                : "border-transparent text-texto-2 hover:text-texto"
-            }`}
-          >
-            {opcion.etiqueta}
-          </Link>
-        ))}
-      </nav>
+      <Pestanas
+        pestanas={VISTAS.map((opcion) => ({
+          href: `/tablero?corte=${corte.id}&vista=${opcion.clave}`,
+          etiqueta: opcion.etiqueta,
+          activa: vista === opcion.clave,
+        }))}
+      />
 
       <TablaZonas
         zonas={tablero.zonas.map((zona) => ({

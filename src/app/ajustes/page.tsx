@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
+import { Pestanas } from "@/components/Pestanas";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TablaZonas, type ColumnaTabla } from "@/components/TablaZonas";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
@@ -79,24 +79,16 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
         />
       </section>
 
-      <nav className="no-imprimir flex gap-1 border-b border-borde-suave">
-        {[
+      <Pestanas
+        pestanas={[
           { clave: "porcentaje", etiqueta: "% sobre ventas" },
           { clave: "monto", etiqueta: "Monto en $" },
-        ].map((opcion) => (
-          <Link
-            key={opcion.clave}
-            href={`/ajustes?corte=${corte.id}&modo=${opcion.clave}`}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors duration-200 ${
-              modo === opcion.clave
-                ? "border-acento font-medium text-acento"
-                : "border-transparent text-texto-2 hover:text-texto"
-            }`}
-          >
-            {opcion.etiqueta}
-          </Link>
-        ))}
-      </nav>
+        ].map((opcion) => ({
+          href: `/ajustes?corte=${corte.id}&modo=${opcion.clave}`,
+          etiqueta: opcion.etiqueta,
+          activa: modo === opcion.clave,
+        }))}
+      />
 
       <TablaZonas zonas={ajustes.zonas} total={ajustes.total} columnas={columnas} />
     </div>
