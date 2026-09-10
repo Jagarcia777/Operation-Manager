@@ -337,9 +337,12 @@ model Extraccion {
   corteId String?
   corte   Corte? @relation(fields: [corteId], references: [id], onDelete: SetNull)
 
-  archivoNombre  String
-  archivoTipo    String
-  archivoRuta    String?
+  archivoNombre String
+  archivoTipo   String
+
+  // El original se guarda en la base y no en disco: en un despliegue serverless el sistema de
+  // archivos es de solo lectura y efímero, y el rastro de auditoría se perdería en cada deploy.
+  archivoContenido Bytes?
   destino        String   @default("VENTAS") // VENTAS | AJUSTES
   estado         String   @default("PENDIENTE") // PENDIENTE | EXTRAIDO | CONFIRMADO | ERROR
   modelo         String?

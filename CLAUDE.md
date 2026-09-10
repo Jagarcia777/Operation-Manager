@@ -66,6 +66,8 @@ src/components/           componentes compartidos de UI
   `src/lib/calculos.ts`; el modelo recibe esa evidencia ya calculada y aporta diagnóstico,
   estimación y recomendaciones con criterio de director de operaciones retail
   (`docs/ESPECIFICACION.md` §2.8). Nunca se le pide que invente o recalcule números.
+- **Tras `prisma generate`, reiniciar `npm run dev`**: el servidor mantiene en memoria el cliente
+  anterior y falla con columnas que "no existen" aunque la migración ya se haya aplicado.
 - Componentes de servidor por defecto; `"use client"` solo donde haga falta interacción.
 - Server Actions para mutaciones; route handlers solo para archivos y respuestas binarias.
 

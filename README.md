@@ -83,15 +83,31 @@ estén vacías. Para pasar a tus datos:
 8. **Documentos**: informe ejecutivo y presentación de tienda, para ver, imprimir a PDF o
    descargar en PowerPoint y Word.
 
-## Despliegue
+## Despliegue en Vercel
 
-La aplicación es un Next.js estándar y corre en cualquier plataforma que ejecute Node.
+1. **Crea la base de datos.** En Neon o Supabase, crea un proyecto PostgreSQL y copia la cadena
+   de conexión. Si el proveedor ofrece una URL *con pool* (pooled / pgbouncer), usa esa: en un
+   entorno serverless cada petición puede abrir su propia conexión y sin pool se agotan.
+2. **Sube el repositorio a GitHub** e impórtalo en Vercel.
+3. **Configura las variables de entorno** en el proyecto de Vercel: `DATABASE_URL`,
+   `APP_PASSWORD_HASH`, `SESSION_SECRET` y, si vas a usar la lectura con IA, `ANTHROPIC_API_KEY`.
+   Genera las dos primeras con `npm run auth:hash`.
+4. **Despliega.** El script `vercel-build` aplica las migraciones y compila, así que la base queda
+   al día en cada despliegue sin pasos manuales.
+5. **Carga el catálogo** la primera vez, apuntando a la base de producción desde tu equipo:
+   `npm run db:seed`.
 
-1. Crea la base PostgreSQL en tu proveedor y copia su cadena de conexión.
-2. Configura las variables de entorno en la plataforma: `DATABASE_URL`, `APP_PASSWORD_HASH`,
-   `SESSION_SECRET` y, si aplica, `ANTHROPIC_API_KEY`.
-3. Comando de build: `npm run build`. Comando de arranque: `npm start`.
-4. Aplica las migraciones contra la base de producción: `npx prisma migrate deploy`.
+Tres cosas que conviene no pasar por alto:
+
+- **Sirve siempre por HTTPS.** La cookie de sesión se marca `secure` en producción y sin TLS no
+  viaja; Vercel da HTTPS por defecto, pero si algún día montas en un servidor propio hay que
+  configurarlo.
+- **`SESSION_SECRET` distinto en cada instalación.** Quien lo tenga puede fabricar sesiones válidas.
+- **La base guarda ventas, márgenes y mermas de la cadena.** Elige un proveedor con cifrado en
+  reposo y copias de seguridad, y no compartas la cadena de conexión.
+
+Los documentos que subes se guardan en la base y no en disco, porque en Vercel el sistema de
+archivos es de solo lectura y se reinicia en cada despliegue.
 
 Tres cosas que conviene no pasar por alto:
 

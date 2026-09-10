@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate && next telemetry disable",
+    "vercel-build": "prisma migrate deploy && next build",
+    "postinstall": "prisma generate && (next telemetry disable || true)",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "auth:hash": "tsx scripts/hash-contrasena.ts"

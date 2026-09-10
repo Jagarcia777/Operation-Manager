@@ -1,8 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -18,7 +15,6 @@ const TIPOS_ACEPTADOS: Record<string, string> = {
 };
 
 const TAMANO_MAXIMO = 20 * 1024 * 1024;
-const CARPETA = path.join(process.cwd(), "uploads");
 
 export async function subirYExtraer(formData: FormData) {
   const corteId = String(formData.get("corteId") ?? "");
@@ -28,19 +24,14 @@ export async function subirYExtraer(formData: FormData) {
   if (!corteId || !(archivo instanceof File) || archivo.size === 0) {
     throw new Error("Falta el corte o el archivo.");
   }
-  const extension = TIPOS_ACEPTADOS[archivo.type];
-  if (!extension) {
+  if (!TIPOS_ACEPTADOS[archivo.type]) {
     throw new Error("Solo se aceptan PDF, PNG, JPG o WEBP.");
   }
   if (archivo.size > TAMANO_MAXIMO) {
     throw new Error("El archivo supera los 20 MB.");
   }
 
-  // El nombre en disco lo genera la app: nada de lo que venga del archivo toca la ruta.
   const buffer = Buffer.from(await archivo.arrayBuffer());
-  const nombreEnDisco = `${randomUUID()}.${extension}`;
-  await mkdir(CARPETA, { recursive: true });
-  await writeFile(path.join(CARPETA, nombreEnDisco), buffer);
 
   const extraccion = await prisma.extraccion.create({
     data: {
@@ -48,7 +39,7 @@ export async function subirYExtraer(formData: FormData) {
       destino,
       archivoNombre: archivo.name,
       archivoTipo: archivo.type,
-      archivoRuta: nombreEnDisco,
+      archivoContenido: buffer,
       estado: "PENDIENTE",
       modelo: MODELO,
     },

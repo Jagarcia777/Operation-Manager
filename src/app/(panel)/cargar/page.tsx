@@ -127,6 +127,14 @@ export default async function CargarPage() {
                   <span className={`chip ${ESTADO_TONO[extraccion.estado]}`}>
                     {ESTADO_TEXTO[extraccion.estado] ?? extraccion.estado}
                   </span>
+                  <a
+                    href={`/api/extracciones/${extraccion.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="boton boton-secundario"
+                  >
+                    Ver original
+                  </a>
                   {extraccion.estado === "EXTRAIDO" && (
                     <Link href={`/cargar/${extraccion.id}`} className="boton boton-secundario">
                       Revisar
