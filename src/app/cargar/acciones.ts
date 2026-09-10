@@ -100,7 +100,6 @@ export async function confirmarExtraccion(formData: FormData) {
 
   const corteId = extraccion.corteId;
   const filas = Number(formData.get("filas") ?? 0);
-  let guardadas = 0;
 
   for (let indice = 0; indice < filas; indice++) {
     const tiendaId = String(formData.get(`fila.${indice}.tiendaId`) ?? "");
@@ -132,7 +131,6 @@ export async function confirmarExtraccion(formData: FormData) {
           create: { corteId, tiendaId, tipologia, monto, porcentaje, origen: "IA" },
         });
       }
-      guardadas++;
       continue;
     }
 
@@ -152,7 +150,6 @@ export async function confirmarExtraccion(formData: FormData) {
       update: { ...valores, origen: "IA" },
       create: { corteId, tiendaId, ...valores, origen: "IA" },
     });
-    guardadas++;
   }
 
   await revisarSubtotalesDeclarados(extraccion, corteId);
