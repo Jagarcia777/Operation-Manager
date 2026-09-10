@@ -28,6 +28,8 @@ export async function guardarPerfil(formData: FormData) {
     update: {
       nombre: texto(formData, "nombre") ?? "Usuario maestro",
       cargo: texto(formData, "cargo") ?? "Operaciones",
+      marca: texto(formData, "marca"),
+      iniciales: texto(formData, "iniciales")?.slice(0, 2).toUpperCase() ?? null,
       zonaPropiaId: texto(formData, "zonaPropiaId"),
       contexto: texto(formData, "contexto"),
       instruccionesCerebro: texto(formData, "instruccionesCerebro"),
@@ -36,6 +38,8 @@ export async function guardarPerfil(formData: FormData) {
       id: "maestro",
       nombre: texto(formData, "nombre") ?? "Usuario maestro",
       cargo: texto(formData, "cargo") ?? "Operaciones",
+      marca: texto(formData, "marca"),
+      iniciales: texto(formData, "iniciales")?.slice(0, 2).toUpperCase() ?? null,
       zonaPropiaId: texto(formData, "zonaPropiaId"),
       contexto: texto(formData, "contexto"),
       instruccionesCerebro: texto(formData, "instruccionesCerebro"),

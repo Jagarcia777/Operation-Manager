@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { salir } from "@/app/entrar/acciones";
+import { Monograma } from "@/components/Monograma";
 
 const GRUPOS = [
   {
@@ -62,14 +63,27 @@ function Icono({ nombre }: { nombre: string }) {
   );
 }
 
-export function BarraLateral({ usuario, cargo }: { usuario: string; cargo: string }) {
+export function BarraLateral({
+  usuario,
+  cargo,
+  marca,
+  iniciales,
+}: {
+  usuario: string;
+  cargo: string;
+  marca: string;
+  iniciales: string;
+}) {
   const ruta = usePathname();
 
   return (
     <nav className="no-imprimir flex shrink-0 gap-1 overflow-x-auto border-b border-borde-suave bg-superficie px-3 py-2 md:h-dvh md:w-60 md:flex-col md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5">
-      <div className="hidden px-3 pb-5 md:block">
-        <p className="text-[15px] font-semibold tracking-[-0.02em]">Operation Manager</p>
-        <p className="mt-0.5 text-xs text-texto-3">Control de ventas y operaciones</p>
+      <div className="hidden items-center gap-2.5 px-3 pb-5 md:flex">
+        <Monograma iniciales={iniciales} tamano={34} />
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold tracking-[-0.02em]">{marca}</p>
+          <p className="truncate text-xs text-texto-3">Control de operaciones</p>
+        </div>
       </div>
 
       {GRUPOS.map((grupo) => (

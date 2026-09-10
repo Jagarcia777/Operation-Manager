@@ -1,4 +1,19 @@
+import { Monograma } from "@/components/Monograma";
+import { prisma } from "@/lib/db";
 import { entrar } from "./acciones";
+
+/** La entrada debe dibujarse aunque la base no esté disponible todavía. */
+async function leerMarca() {
+  try {
+    const perfil = await prisma.perfil.findUnique({ where: { id: "maestro" } });
+    return {
+      nombre: perfil?.marca || "Operation Manager",
+      iniciales: perfil?.iniciales || "OM",
+    };
+  } catch {
+    return { nombre: "Operation Manager", iniciales: "OM" };
+  }
+}
 
 const MENSAJES: Record<string, string> = {
   credenciales: "Contraseña incorrecta.",
@@ -9,12 +24,14 @@ const MENSAJES: Record<string, string> = {
 export default async function EntrarPage({ searchParams }: PageProps<"/entrar">) {
   const parametros = await searchParams;
   const error = typeof parametros.error === "string" ? MENSAJES[parametros.error] : null;
+  const marca = await leerMarca();
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-5">
       <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl">Operation Manager</h1>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Monograma iniciales={marca.iniciales} tamano={56} />
+          <h1 className="mt-3 text-2xl">{marca.nombre}</h1>
           <p className="mt-1 text-sm text-texto-2">Control de ventas y operaciones</p>
         </div>
 

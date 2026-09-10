@@ -268,13 +268,22 @@ async function main() {
   if (umbrales === 0) await sembrarUmbrales();
   await sembrarBenchmarks();
 
+  // La marca solo se rellena si aún no está definida: lo que el usuario edite manda.
+  const perfilExistente = await prisma.perfil.findUnique({ where: { id: "maestro" } });
+
   await prisma.perfil.upsert({
     where: { id: "maestro" },
-    update: { zonaPropiaId: oriente.id },
+    update: {
+      zonaPropiaId: oriente.id,
+      ...(perfilExistente?.marca ? {} : { marca: "JG Operaciones" }),
+      ...(perfilExistente?.iniciales ? {} : { iniciales: "JG" }),
+    },
     create: {
       id: "maestro",
       nombre: "José García",
       cargo: "Director de Operaciones",
+      marca: "JG Operaciones",
+      iniciales: "JG",
       zonaPropiaId: oriente.id,
       contexto:
         "Gestiono las 6 tiendas de Zona Oriente de Rio Supermarket y las comparo contra la " +

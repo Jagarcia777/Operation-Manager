@@ -298,6 +298,10 @@ model Perfil {
   zonaPropiaId String?
   zonaPropia   Zona?   @relation(fields: [zonaPropiaId], references: [id], onDelete: SetNull)
 
+  // Identidad de la herramienta: cómo se llama y con qué monograma se firma lo que produce.
+  marca     String?
+  iniciales String?
+
   // Contexto del negocio y de su forma de trabajo, en texto libre: alimenta al cerebro analítico.
   contexto             String?
   instruccionesCerebro String?

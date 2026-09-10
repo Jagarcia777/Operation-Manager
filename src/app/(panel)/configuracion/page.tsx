@@ -1,3 +1,4 @@
+import { Monograma } from "@/components/Monograma";
 import { Pestanas } from "@/components/Pestanas";
 import { prisma } from "@/lib/db";
 import { ESTADOS_CORTE, ETIQUETA_ESTADO_CORTE, ETIQUETA_TIPO_CORTE, TIPOS_CORTE } from "@/lib/dominio";
@@ -70,6 +71,37 @@ async function SeccionPerfil() {
 
   return (
     <form action={guardarPerfil} className="tarjeta max-w-3xl space-y-4 p-5">
+      <div className="flex items-center gap-3 border-b border-borde-suave pb-4">
+        <Monograma iniciales={perfil?.iniciales || "OM"} tamano={44} />
+        <div>
+          <p className="text-sm font-medium">{perfil?.marca || "Sin marca definida"}</p>
+          <p className="text-xs text-texto-3">Así se firma la herramienta y lo que produce.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <label className="block text-sm">
+          <span className="text-texto-2">Marca</span>
+          <input
+            name="marca"
+            defaultValue={perfil?.marca ?? ""}
+            placeholder="JG Operaciones"
+            className="campo mt-1.5"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="text-texto-2">Monograma</span>
+          <input
+            name="iniciales"
+            maxLength={2}
+            defaultValue={perfil?.iniciales ?? ""}
+            placeholder="JG"
+            className="campo mt-1.5 uppercase"
+          />
+        </label>
+        <div />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="block text-sm">
           <span className="text-texto-2">Nombre</span>
