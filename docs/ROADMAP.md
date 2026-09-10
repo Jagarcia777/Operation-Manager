@@ -62,7 +62,15 @@ si algo queda a medias.
 - [x] Exportación de la presentación de tienda a PowerPoint y Word
 - [ ] Venta diaria para el análisis por día de la semana
 
-## Fase 7 — Cierre
+## Fase 7 — Salir del equipo
+
+- [x] Autenticación: contraseña, sesión firmada y protección de todas las rutas
+- [x] Identidad de marca propia con monograma configurable
+- [x] Migración de SQLite a PostgreSQL
+- [x] Documentación del despliegue
+- [ ] Desplegar en el proveedor elegido y probar desde el móvil
+
+## Fase 8 — Cierre
 
 - [x] Navegación agrupada y sistema visual consistente
 - [x] `npm run build` y `npm run lint` limpios

@@ -189,26 +189,33 @@ La cadena está en crecimiento, así que nada del dominio vive fijo en el códig
 
 ## 5. Seguridad y privacidad
 
-La información del negocio es sensible, así que el sistema corre **en el entorno del usuario** y
-no delega sus datos a servicios de terceros.
+La información del negocio es sensible. El sistema nació para correr solo en el equipo del usuario;
+al decidirse su despliegue para acceder desde el móvil, esa premisa cambió y conviene tenerlo claro:
+**los datos pasan a vivir en la base PostgreSQL que se configure**, sea local o de un proveedor.
+Lo que sigue vigente es todo lo demás.
 
-- **Todo es local**: la aplicación se ejecuta en su equipo y la base de datos es un archivo suyo
-  (`prisma/dev.db`). No hay servidor compartido, ni cuentas, ni sincronización a la nube.
-- **Solo escucha en localhost**: `npm run dev` y `npm start` se atan a `127.0.0.1`, de modo que la
-  app no queda expuesta a la red local.
+- **Un solo usuario y siempre autenticado**: no hay acceso anónimo. La contraseña se guarda como
+  hash scrypt y la sesión viaja en una cookie firmada con HMAC, marcada `httpOnly` y `secure` en
+  producción. Todas las rutas quedan protegidas salvo la pantalla de entrada.
 - **Sin recursos de terceros**: tipografías del sistema, nada de CDN ni fuentes remotas, y una
   política de contenido (CSP) que restringe la app a su propio origen. Sin analítica. La telemetría
   anónima que Next.js trae activada de fábrica se desactiva sola al instalar (`postinstall`), para
   que la promesa no dependa de acordarse de un comando.
-- **La única salida a internet es la IA, y es explícita**: la extracción del PDF/imagen y la
-  asesoría del cerebro analítico usan la API de Anthropic con la clave del propio usuario, por
-  TLS. Se envía únicamente el archivo a leer o las métricas ya calculadas del corte —nunca la base
-  completa— y esas funciones quedan inactivas si no hay clave configurada. El resto de la
-  aplicación funciona sin conexión.
-- **Credenciales fuera del repositorio**: la clave vive en `.env`, que está ignorado por git, y se
-  usa solo del lado del servidor; nunca llega al navegador.
-- **Archivos cargados**: los PDF/imágenes originales se guardan localmente en una carpeta ignorada
-  por git y pueden borrarse desde la app.
+- **La salida a internet por IA es explícita y mínima**: la extracción del PDF/imagen y el análisis
+  del corte usan la API de Anthropic con la clave del propio usuario, por TLS. Se envía únicamente
+  el archivo a leer o las métricas ya calculadas —nunca la base completa— y esas funciones quedan
+  inactivas si no hay clave configurada.
+- **Credenciales fuera del repositorio**: viven en `.env`, ignorado por git, y se usan solo del
+  lado del servidor; nunca llegan al navegador.
+- **Archivos cargados**: los PDF/imágenes originales se guardan en una carpeta ignorada por git y
+  pueden borrarse desde la app.
+
+### Lo que hay que tener presente al desplegar
+
+- La base contiene ventas, márgenes y mermas de la cadena. Elegir un proveedor con cifrado en
+  reposo y copias de seguridad, y no compartir la cadena de conexión.
+- `SESSION_SECRET` debe ser distinto en cada instalación: quien lo tenga puede fabricar sesiones.
+- Servir siempre por HTTPS. La cookie de sesión se marca `secure` en producción y sin TLS no viaja.
 
 ## 6. Fuera de alcance por ahora
 

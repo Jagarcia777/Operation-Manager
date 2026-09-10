@@ -14,7 +14,7 @@ Estado y fases: `docs/ROADMAP.md` — actualizar las casillas al terminar cada b
 
 - Next.js 16 (App Router) + React 19 + TypeScript
 - Tailwind CSS v4
-- Prisma + SQLite (`prisma/dev.db`)
+- Prisma + PostgreSQL (adaptador `@prisma/adapter-pg`)
 - `@anthropic-ai/sdk` para la extracción de PDF/imagen (`claude-opus-5`)
 - `pptxgenjs` / `docx` para exportar PowerPoint y Word
 
@@ -50,8 +50,9 @@ src/components/           componentes compartidos de UI
 - **Vocabulario del dominio en español** en modelos, campos, rutas y UI (`Tienda`, `Corte`,
   `Merma`, `Meta`/`Real`). El andamiaje técnico genérico va en inglés. No traducir términos
   del negocio: "Activo" es el valor real ejecutado, no un booleano.
-- **SQLite no soporta enums ni Json en Prisma**: usar `String` y declarar las uniones en
-  `src/lib/dominio.ts` (constantes + tipos TS). Los payloads JSON se guardan como texto.
+- **Los tipos cerrados son `String`, no enums de base de datos**: las uniones se declaran en
+  `src/lib/dominio.ts` (constantes + tipos TS), de modo que sumar una tipología o un estado sea
+  un cambio de código y no una migración. Los payloads JSON se guardan como texto.
 - **Los subtotales y totales nunca se capturan** en las zonas detalladas: se derivan del detalle
   por tienda. Si una fuente externa trae un subtotal, se compara y se levanta una alerta si
   difiere. La excepción son las zonas con `detallada = false`, de las que solo llega el agregado:
@@ -89,9 +90,11 @@ Los tokens viven en `src/app/globals.css`; usarlos siempre en vez de valores sue
 
 ## Seguridad
 
-La data del negocio es sensible y la app corre en el equipo del usuario (`docs/ESPECIFICACION.md` §5).
+La data del negocio es sensible (`docs/ESPECIFICACION.md` §5).
 
-- Todo local: base SQLite propia, servidor atado a `127.0.0.1`, sin cuentas ni sincronización.
+- **Un solo usuario, siempre autenticado**: sesión firmada con HMAC en cookie `httpOnly` y
+  contraseña en hash scrypt. El middleware protege todo salvo `/entrar` y los estáticos.
+  Cualquier ruta nueva queda protegida por defecto; no agregar excepciones al matcher sin motivo.
 - Sin recursos de terceros en el cliente: tipografías del sistema, CSP restringida al propio
   origen, sin analítica. No agregar CDNs, fuentes remotas ni scripts externos.
 - La única salida a internet es la API de Anthropic, siempre desde el servidor y solo con lo

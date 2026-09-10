@@ -1,6 +1,7 @@
 // Modelo de datos de Operation Manager.
-// SQLite no soporta enums ni Json en Prisma: los campos de tipo cerrado son String y sus
-// valores válidos viven en src/lib/dominio.ts; los payloads JSON se guardan como texto.
+// Los campos de tipo cerrado son String y sus valores válidos viven en src/lib/dominio.ts,
+// no enums de base de datos: así agregar una tipología o un estado es un cambio de código y
+// no una migración. Los payloads JSON se guardan como texto por la misma razón.
 
 generator client {
   provider = "prisma-client"
@@ -9,7 +10,7 @@ generator client {
 
 // La URL de conexión vive en prisma.config.ts (Prisma 7).
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Zona {

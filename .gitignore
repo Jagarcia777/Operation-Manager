@@ -34,10 +34,12 @@ yarn-error.log*
 .env*
 !.env.example
 
-# base de datos local y archivos cargados
-prisma/*.db
-prisma/*.db-journal
+# archivos cargados
 /uploads
+
+# bases locales sueltas (la aplicación usa PostgreSQL)
+*.db
+*.db-journal
 
 # cliente Prisma generado (se regenera con `npx prisma generate`)
 /src/generated

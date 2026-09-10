@@ -1,26 +1,24 @@
 # Operation Manager
 
-Control de ventas y operaciones de una cadena retail de 24 tiendas en 4 zonas. Sustituye el
-mantenimiento manual del Tablero de Control de Ventas y del Reporte de Ajustes por Tipología:
-lee los números de cada corte, los valida, marca las inconsistencias y arma los documentos de
-decisión para las reuniones de gerencia.
+Control de ventas y operaciones de **Zona Oriente de Rio Supermarket**: 6 tiendas gestionadas al
+detalle, medidas contra la cadena nacional. Sustituye el mantenimiento manual del Tablero de
+Control de Ventas y del Reporte de Ajustes por Tipología: lee los números de cada corte, los
+valida, marca las inconsistencias y arma los documentos de decisión para las reuniones de gerencia.
 
-La aplicación corre **en tu equipo**: la base de datos es un archivo local, el servidor solo
-escucha en `127.0.0.1` y no hay cuentas ni sincronización a la nube. La telemetría anónima que
-Next.js trae activada de fábrica se desactiva sola durante `npm install`.
+## Requisitos
 
-## Instalación
+- **Node.js 20** o superior
+- **PostgreSQL**, propio o de un proveedor (Neon, Supabase, Railway…)
+- **git**
 
-Necesitas **Node.js 20 o superior** y **git**. Para comprobar que los tienes:
+Para comprobar lo que ya tienes:
 
 ```bash
 node --version
 git --version
 ```
 
-Si falta Node, se descarga de [nodejs.org](https://nodejs.org) (versión LTS).
-
-Después, en la terminal:
+## Instalación
 
 ```bash
 git clone https://github.com/Jagarcia777/Operation-Manager.git
@@ -34,53 +32,74 @@ npm install
 Crea tu archivo de variables a partir de la plantilla:
 
 ```bash
-cp .env.example .env
+cp .env.example .env          # en PowerShell: Copy-Item .env.example .env
 ```
 
-En Windows con PowerShell:
+Genera la contraseña de acceso y el secreto de sesión:
 
-```powershell
-Copy-Item .env.example .env
+```bash
+npm run auth:hash -- "tu contraseña"
 ```
 
-Abre `.env` y pega tu clave de la API de Anthropic entre las comillas:
+Ese comando imprime dos líneas, `APP_PASSWORD_HASH` y `SESSION_SECRET`. Pégalas en `.env` junto a
+la cadena de conexión de tu base y, si vas a usar la lectura con IA, tu clave de Anthropic:
 
 ```
+DATABASE_URL="postgresql://usuario:clave@host:5432/operation_manager"
+APP_PASSWORD_HASH="scrypt:..."
+SESSION_SECRET="..."
 ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-La clave se genera en la consola de Anthropic, en la sección de API keys, y se factura por uso.
-`.env` está ignorado por git, así que la clave nunca sale de tu equipo. Si alguna vez la pegas en
-un chat o un correo, genera una nueva.
+`.env` está ignorado por git, así que nada de eso sale de tu equipo. Si alguna vez pegas la clave
+en un chat o un correo, genera una nueva.
 
-Sin clave la aplicación funciona igual: solo quedan desactivadas la lectura automática de
-documentos y el análisis del corte.
+Sin `ANTHROPIC_API_KEY` la aplicación funciona igual: solo quedan desactivadas la lectura
+automática de documentos y el análisis del corte.
 
 ## Puesta en marcha
 
 ```bash
-npx prisma migrate deploy   # crea la base de datos local
-npx prisma db seed          # carga zonas, tiendas y dos cortes de ejemplo
-npm run dev                 # arranca la aplicación
+npx prisma migrate deploy   # crea las tablas
+npm run db:seed             # catálogo de Zona Oriente y datos de ejemplo
+npm run dev                 # arranca en http://127.0.0.1:3000
 ```
 
-Abre `http://127.0.0.1:3000`. Para detenerla, `Ctrl + C` en la terminal.
-
-En los siguientes arranques basta con `npm run dev`.
+En los siguientes arranques basta con `npm run dev`. Para detenerla, `Ctrl + C`.
 
 ## Primer uso
 
-El seed trae 24 tiendas de relleno y dos cortes inventados, para que las pantallas no estén
-vacías. Para pasar a tus datos:
+El seed trae el catálogo real de Zona Oriente con cifras inventadas, para que las pantallas no
+estén vacías. Para pasar a tus datos:
 
-1. **Configuración → Zonas y tiendas**: corrige los nombres reales de cada tienda y su zona.
-2. **Configuración → Cortes**: elimina los dos cortes de ejemplo y crea el tuyo.
-3. **Cargar datos**: sube el Dashboard Ejecutivo en PDF o imagen, revisa lo que leyó y confirma.
-   Si prefieres teclear los números, usa la pestaña de captura manual.
-4. **Alertas → Revisar corte**: busca inconsistencias en lo cargado.
-5. **Análisis**: diagnóstico del corte con recomendaciones priorizadas por dinero.
-6. **Documentos**: presentación de tienda e informe ejecutivo, para ver, imprimir a PDF o
+1. **Configuración → Perfil**: tu marca y monograma.
+2. **Configuración → Zonas y tiendas**: nombra las cinco zonas de comparación y revisa los alias.
+3. **Configuración → Benchmarks**: carga tus referencias de margen, RPT, UPT, ASP y merma.
+4. **Configuración → Cortes**: elimina los cortes de ejemplo y crea el tuyo.
+5. **Cargar datos**: sube el Dashboard Ejecutivo en PDF o imagen, revisa lo leído y confirma. Si
+   prefieres teclear los números, usa la pestaña de captura manual.
+6. **Alertas → Revisar corte**: busca inconsistencias en lo cargado.
+7. **Análisis**: diagnóstico con recomendaciones priorizadas por dinero.
+8. **Documentos**: informe ejecutivo y presentación de tienda, para ver, imprimir a PDF o
    descargar en PowerPoint y Word.
+
+## Despliegue
+
+La aplicación es un Next.js estándar y corre en cualquier plataforma que ejecute Node.
+
+1. Crea la base PostgreSQL en tu proveedor y copia su cadena de conexión.
+2. Configura las variables de entorno en la plataforma: `DATABASE_URL`, `APP_PASSWORD_HASH`,
+   `SESSION_SECRET` y, si aplica, `ANTHROPIC_API_KEY`.
+3. Comando de build: `npm run build`. Comando de arranque: `npm start`.
+4. Aplica las migraciones contra la base de producción: `npx prisma migrate deploy`.
+
+Tres cosas que conviene no pasar por alto:
+
+- **Sirve siempre por HTTPS.** La cookie de sesión se marca `secure` en producción y sin TLS no
+  viaja, así que la aplicación quedaría inaccesible.
+- **`SESSION_SECRET` distinto en cada instalación.** Quien lo tenga puede fabricar sesiones válidas.
+- **La base guarda ventas, márgenes y mermas de la cadena.** Elige un proveedor con cifrado en
+  reposo y copias de seguridad, y no compartas la cadena de conexión.
 
 ## Comandos
 
@@ -89,8 +108,10 @@ npm run dev             # servidor de desarrollo
 npm run build           # build de producción
 npm run lint            # eslint
 npm start               # servir el build de producción
-npx prisma studio       # ver y editar la base de datos
-npm run db:seed         # recargar los datos de ejemplo
+npm run auth:hash       # generar contraseña y secreto de sesión
+npm run db:seed         # recargar el catálogo y los datos de ejemplo
+npm run db:reset        # recrear la base desde cero
+npx prisma studio       # ver y editar la base
 ```
 
 ## Documentación
