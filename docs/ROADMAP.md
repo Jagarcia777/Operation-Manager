@@ -16,7 +16,8 @@ si algo queda a medias.
 - [x] `src/lib/dominio.ts`: constantes y tipos del dominio
 - [x] `src/lib/calculos.ts`: KPIs derivados, subtotales por zona, total cadena, cumplimiento
 - [x] Administración de zonas, tiendas, cortes, umbrales, perfil y memoria operativa
-- [ ] Captura manual por tienda/corte + importación CSV de respaldo
+- [x] Captura manual por tienda/corte (respaldo sin IA)
+- [ ] Importación CSV con plantilla fija
 
 ## Fase 2 — Ingesta con IA
 

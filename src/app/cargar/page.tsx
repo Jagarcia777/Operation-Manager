@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
+import { Pestanas } from "@/components/Pestanas";
 import { listarCortes } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { hayClaveIA } from "@/lib/extraccion/extraer";
@@ -41,6 +42,13 @@ export default async function CargarPage() {
           guarda hasta que revises y confirmes lo extraído.
         </p>
       </header>
+
+      <Pestanas
+        pestanas={[
+          { href: "/cargar", etiqueta: "Leer un documento", activa: true },
+          { href: "/cargar/manual", etiqueta: "Captura manual", activa: false },
+        ]}
+      />
 
       {!conClave && (
         <div className="tarjeta border-atencion-tenue bg-atencion-tenue px-4 py-3 text-sm text-atencion">

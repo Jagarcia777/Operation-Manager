@@ -216,6 +216,41 @@ async function revisarSubtotalesDeclarados(
   }
 }
 
+/** Captura manual: respaldo cuando no hay documento que leer o falla la lectura automática. */
+export async function guardarCapturaManual(formData: FormData) {
+  const corteId = String(formData.get("corteId") ?? "");
+  if (!corteId) return;
+
+  const tiendaIds = formData.getAll("tiendaId").map(String);
+
+  for (const tiendaId of tiendaIds) {
+    const valores = {
+      ventasMeta: aNumero(formData.get(`${tiendaId}.ventasMeta`)),
+      ventasReal: aNumero(formData.get(`${tiendaId}.ventasReal`)),
+      unidadesMeta: aNumero(formData.get(`${tiendaId}.unidadesMeta`)),
+      unidadesReal: aNumero(formData.get(`${tiendaId}.unidadesReal`)),
+      transaccionesMeta: aNumero(formData.get(`${tiendaId}.transaccionesMeta`)),
+      transaccionesReal: aNumero(formData.get(`${tiendaId}.transaccionesReal`)),
+      margenBrutoMeta: aNumero(formData.get(`${tiendaId}.margenBrutoMeta`)),
+      margenBrutoReal: aNumero(formData.get(`${tiendaId}.margenBrutoReal`)),
+    };
+
+    const tieneAlgo = Object.values(valores).some((valor) => valor !== null);
+    if (!tieneAlgo) continue;
+
+    await prisma.registroVentas.upsert({
+      where: { corteId_tiendaId: { corteId, tiendaId } },
+      update: { ...valores, origen: "MANUAL" },
+      create: { corteId, tiendaId, ...valores, origen: "MANUAL" },
+    });
+  }
+
+  await sincronizarAlertas(corteId);
+  revalidatePath("/tablero");
+  revalidatePath("/");
+  redirect(`/tablero?corte=${corteId}`);
+}
+
 export async function borrarExtraccion(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
