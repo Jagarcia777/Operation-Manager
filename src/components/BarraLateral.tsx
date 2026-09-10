@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { salir } from "@/app/entrar/acciones";
 
 const GRUPOS = [
   {
@@ -101,6 +102,11 @@ export function BarraLateral({ usuario, cargo }: { usuario: string; cargo: strin
       <div className="mt-auto hidden border-t border-borde-suave px-3 pt-4 md:block">
         <p className="text-sm font-medium">{usuario}</p>
         <p className="text-xs text-texto-3">{cargo}</p>
+        <form action={salir} className="mt-2">
+          <button type="submit" className="text-xs text-texto-3 hover:text-texto">
+            Cerrar sesión
+          </button>
+        </form>
       </div>
     </nav>
   );
