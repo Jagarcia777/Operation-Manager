@@ -65,6 +65,24 @@ model Corte {
   extracciones Extraccion[]
   planes       PlanAccion[]
   notas        NotaMemoria[]
+  analisis     Analisis[]
+}
+
+// Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
+// poder comparar qué se dijo en un corte contra lo que pasó en el siguiente.
+model Analisis {
+  id        String  @id @default(cuid())
+  corteId   String
+  corte     Corte   @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  alcance   String  @default("CADENA") // CADENA | ZONA | TIENDA
+  zonaId    String?
+  tiendaId  String?
+  contenido String // JSON del análisis
+  modelo    String
+
+  creadoEn DateTime @default(now())
+
+  @@index([corteId, alcance])
 }
 
 model RegistroVentas {

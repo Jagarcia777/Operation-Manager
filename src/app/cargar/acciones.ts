@@ -1,0 +1,227 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { TIPOLOGIAS, type Tipologia } from "@/lib/dominio";
+import { MODELO, extraerAjustes, extraerVentas } from "@/lib/extraccion/extraer";
+import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
+
+const TIPOS_ACEPTADOS: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+const TAMANO_MAXIMO = 20 * 1024 * 1024;
+const CARPETA = path.join(process.cwd(), "uploads");
+
+export async function subirYExtraer(formData: FormData) {
+  const corteId = String(formData.get("corteId") ?? "");
+  const destino = String(formData.get("destino") ?? "VENTAS");
+  const archivo = formData.get("archivo");
+
+  if (!corteId || !(archivo instanceof File) || archivo.size === 0) {
+    throw new Error("Falta el corte o el archivo.");
+  }
+  const extension = TIPOS_ACEPTADOS[archivo.type];
+  if (!extension) {
+    throw new Error("Solo se aceptan PDF, PNG, JPG o WEBP.");
+  }
+  if (archivo.size > TAMANO_MAXIMO) {
+    throw new Error("El archivo supera los 20 MB.");
+  }
+
+  // El nombre en disco lo genera la app: nada de lo que venga del archivo toca la ruta.
+  const buffer = Buffer.from(await archivo.arrayBuffer());
+  const nombreEnDisco = `${randomUUID()}.${extension}`;
+  await mkdir(CARPETA, { recursive: true });
+  await writeFile(path.join(CARPETA, nombreEnDisco), buffer);
+
+  const extraccion = await prisma.extraccion.create({
+    data: {
+      corteId,
+      destino,
+      archivoNombre: archivo.name,
+      archivoTipo: archivo.type,
+      archivoRuta: nombreEnDisco,
+      estado: "PENDIENTE",
+      modelo: MODELO,
+    },
+  });
+
+  try {
+    const entrada = { datos: buffer.toString("base64"), tipoMime: archivo.type };
+    const lectura =
+      destino === "AJUSTES" ? await extraerAjustes(entrada) : await extraerVentas(entrada);
+
+    await prisma.extraccion.update({
+      where: { id: extraccion.id },
+      data: { estado: "EXTRAIDO", respuestaCruda: JSON.stringify(lectura) },
+    });
+  } catch (error) {
+    await prisma.extraccion.update({
+      where: { id: extraccion.id },
+      data: {
+        estado: "ERROR",
+        error: error instanceof Error ? error.message : "Error desconocido al leer el archivo.",
+      },
+    });
+  }
+
+  revalidatePath("/cargar");
+  redirect(`/cargar/${extraccion.id}`);
+}
+
+function aNumero(valor: FormDataEntryValue | null): number | null {
+  if (valor === null) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  const numero = Number(texto.replace(",", "."));
+  return Number.isFinite(numero) ? numero : null;
+}
+
+const CAMPO_POR_TIPOLOGIA: Record<Tipologia, string> = {
+  MERMA: "merma",
+  MERCANCIA_DANADA: "mercanciaDanada",
+  CARGA_DESCARGA: "cargaYDescarga",
+  INVENTARIO: "inventario",
+  ERRORES_VENTA: "erroresDeVenta",
+};
+
+export async function confirmarExtraccion(formData: FormData) {
+  const extraccionId = String(formData.get("extraccionId") ?? "");
+  const extraccion = await prisma.extraccion.findUnique({ where: { id: extraccionId } });
+  if (!extraccion?.corteId) throw new Error("Extracción no encontrada.");
+
+  const corteId = extraccion.corteId;
+  const filas = Number(formData.get("filas") ?? 0);
+  let guardadas = 0;
+
+  for (let indice = 0; indice < filas; indice++) {
+    const tiendaId = String(formData.get(`fila.${indice}.tiendaId`) ?? "");
+    if (!tiendaId) continue;
+
+    if (extraccion.destino === "AJUSTES") {
+      const ventasReal = (
+        await prisma.registroVentas.findUnique({
+          where: { corteId_tiendaId: { corteId, tiendaId } },
+        })
+      )?.ventasReal;
+
+      for (const tipologia of TIPOLOGIAS) {
+        const leido = aNumero(formData.get(`fila.${indice}.${CAMPO_POR_TIPOLOGIA[tipologia]}`));
+        if (leido === null) continue;
+
+        // El documento puede venir en % o en monto; se guarda siempre el monto.
+        const esPorcentaje = String(formData.get("unidad") ?? "MONTO") === "PORCENTAJE";
+        const monto = esPorcentaje ? ((ventasReal ?? 0) * leido) / 100 : leido;
+        const porcentaje = esPorcentaje
+          ? leido
+          : ventasReal
+            ? (leido / ventasReal) * 100
+            : null;
+
+        await prisma.registroAjuste.upsert({
+          where: { corteId_tiendaId_tipologia: { corteId, tiendaId, tipologia } },
+          update: { monto, porcentaje, origen: "IA" },
+          create: { corteId, tiendaId, tipologia, monto, porcentaje, origen: "IA" },
+        });
+      }
+      guardadas++;
+      continue;
+    }
+
+    const valores = {
+      ventasMeta: aNumero(formData.get(`fila.${indice}.ventasMeta`)),
+      ventasReal: aNumero(formData.get(`fila.${indice}.ventasReal`)),
+      unidadesMeta: aNumero(formData.get(`fila.${indice}.unidadesMeta`)),
+      unidadesReal: aNumero(formData.get(`fila.${indice}.unidadesReal`)),
+      transaccionesMeta: aNumero(formData.get(`fila.${indice}.transaccionesMeta`)),
+      transaccionesReal: aNumero(formData.get(`fila.${indice}.transaccionesReal`)),
+      margenBrutoMeta: aNumero(formData.get(`fila.${indice}.margenBrutoMeta`)),
+      margenBrutoReal: aNumero(formData.get(`fila.${indice}.margenBrutoReal`)),
+    };
+
+    await prisma.registroVentas.upsert({
+      where: { corteId_tiendaId: { corteId, tiendaId } },
+      update: { ...valores, origen: "IA" },
+      create: { corteId, tiendaId, ...valores, origen: "IA" },
+    });
+    guardadas++;
+  }
+
+  await revisarSubtotalesDeclarados(extraccion, corteId);
+
+  await prisma.extraccion.update({
+    where: { id: extraccionId },
+    data: { estado: "CONFIRMADO" },
+  });
+
+  await sincronizarAlertas(corteId);
+
+  revalidatePath("/tablero");
+  revalidatePath("/alertas");
+  revalidatePath("/");
+  redirect(extraccion.destino === "AJUSTES" ? "/ajustes" : "/tablero");
+}
+
+/**
+ * Compara los subtotales impresos en el documento con la suma real de las tiendas cargadas.
+ * Es la verificación que hoy se hace a mano y la que más errores de fuente destapa.
+ */
+async function revisarSubtotalesDeclarados(
+  extraccion: { respuestaCruda: string | null; destino: string },
+  corteId: string,
+) {
+  if (extraccion.destino !== "VENTAS" || !extraccion.respuestaCruda) return;
+
+  let lectura: { subtotalesDeclarados?: { etiqueta: string; ventas: number | null }[] };
+  try {
+    lectura = JSON.parse(extraccion.respuestaCruda);
+  } catch {
+    return;
+  }
+  const declarados = lectura.subtotalesDeclarados ?? [];
+  if (!declarados.length) return;
+
+  const [umbrales, zonas, registros] = await Promise.all([
+    leerUmbrales(),
+    prisma.zona.findMany({ include: { tiendas: { select: { id: true } } } }),
+    prisma.registroVentas.findMany({ where: { corteId } }),
+  ]);
+  const ventaPorTienda = new Map(registros.map((r) => [r.tiendaId, r.ventasReal ?? 0]));
+  const totalCadena = registros.reduce((suma, r) => suma + (r.ventasReal ?? 0), 0);
+
+  for (const declarado of declarados) {
+    if (declarado.ventas === null) continue;
+
+    const zona = zonas.find((z) =>
+      declarado.etiqueta.toLowerCase().includes(z.gerente.toLowerCase().split(" ")[0]),
+    );
+    const suma = zona
+      ? zona.tiendas.reduce((total, tienda) => total + (ventaPorTienda.get(tienda.id) ?? 0), 0)
+      : totalCadena;
+
+    const alerta = revisarSubtotal(
+      declarado.etiqueta,
+      declarado.ventas,
+      suma,
+      umbrales.TOLERANCIA_SUBTOTAL,
+    );
+    if (alerta) {
+      await prisma.alerta.create({ data: { ...alerta, corteId } });
+    }
+  }
+}
+
+export async function borrarExtraccion(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.extraccion.delete({ where: { id } });
+  revalidatePath("/cargar");
+}
