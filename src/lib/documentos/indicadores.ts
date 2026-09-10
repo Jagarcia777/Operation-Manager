@@ -45,6 +45,8 @@ export type EscenariosCierre = {
   ritmoRequerido: number | null;
   exigencia: number | null;
   viabilidad: Viabilidad | null;
+  /** La meta del período ya está cubierta con lo acumulado. */
+  metaSuperada: boolean;
 };
 
 // Amplitud de los escenarios sobre el ritmo actual. Es un supuesto, y como tal se declara
@@ -69,9 +71,13 @@ export function escenariosCierre(
       ? acumulado / corte.diasTranscurridos
       : null;
 
+  const faltante = meta !== null && acumulado !== null ? meta - acumulado : null;
+  const metaSuperada = faltante !== null && faltante <= 0;
+
+  // Si la meta ya está cubierta no hace falta ritmo adicional: cero, no un número negativo.
   const ritmoRequerido =
-    meta !== null && acumulado !== null && diasRestantes && diasRestantes > 0
-      ? (meta - acumulado) / diasRestantes
+    faltante !== null && diasRestantes && diasRestantes > 0
+      ? Math.max(faltante / diasRestantes, 0)
       : null;
 
   const exigencia =
@@ -98,6 +104,7 @@ export function escenariosCierre(
     ritmoRequerido,
     exigencia,
     viabilidad,
+    metaSuperada,
   };
 }
 

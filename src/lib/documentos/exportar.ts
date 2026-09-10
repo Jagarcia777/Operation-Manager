@@ -16,7 +16,7 @@ import { analizarCategorias, consolidarCategorias } from "@/lib/categorias";
 import { ETIQUETA_BCG, ETIQUETA_TIPOLOGIA, TIPOLOGIAS } from "@/lib/dominio";
 import { moneda, numero, porcentaje, variacion } from "@/lib/formato";
 import type { DatosInforme, DatosPresentacion } from "./datos";
-import { ETIQUETA_VIABILIDAD, escenariosCierre } from "./indicadores";
+import { ETIQUETA_VIABILIDAD, diagnosticar, escenariosCierre, ritmoDiario } from "./indicadores";
 
 const TINTA = "1D1D1F";
 const GRIS = "6E6E73";
@@ -134,21 +134,65 @@ export async function pptxPresentacionTienda(datos: DatosPresentacion): Promise<
     },
   ]);
 
+  const lectura = diagnosticar(
+    tienda.nombre,
+    fila,
+    datos.subtotalZona ?? fila,
+    datos.margenMinimo,
+  );
+  laminaLista(pptx, "Fortalezas", lectura.fortalezas);
+  laminaLista(pptx, "Alertas y riesgos", lectura.alertas);
+
   laminaLista(pptx, "Dónde está parada", [
-    `Posición ${datos.posicionCadena} de ${datos.totalTiendas} en la cadena`,
     `Posición ${datos.posicionZona} de ${datos.tiendasEnZona} en ${tienda.zona.nombre}`,
-    `Variación contra ${datos.corteAnterior?.nombre ?? "el corte anterior"}: ${variacion(datos.variacionVentas)}`,
+    `Venta por día: ${moneda(ritmoDiario(fila.ventasReal, datos.corte.diasTranscurridos))}`,
     `Unidades por transacción: ${numero(fila.upt, 2)}`,
+    `Margen bruto: ${porcentaje(fila.margenBrutoReal)}`,
   ]);
 
   laminaTabla(pptx, "Dónde se pierde dinero", [
-    ["Tipología", "Monto", "% ventas", "Mediana cadena"],
+    ["Tipología", "Monto", "% ventas", "Mediana zona"],
     ...datos.ajustes.map((ajuste) => [
       ajuste.etiqueta,
       moneda(ajuste.monto),
       porcentaje(ajuste.porcentaje, 2),
       porcentaje(ajuste.medianaCadena, 2),
     ]),
+  ]);
+
+  const mezclaTienda = analizarCategorias(consolidarCategorias(datos.categorias));
+  if (mezclaTienda.filas.length) {
+    laminaTabla(pptx, "Mezcla por categoría", [
+      ["Categoría", "Peso", "%MB", "BCG"],
+      ...mezclaTienda.filas
+        .slice(0, 8)
+        .map((categoria) => [
+          categoria.categoria,
+          porcentaje(categoria.pesoVenta),
+          porcentaje(categoria.margenBrutoReal),
+          ETIQUETA_BCG[categoria.claseBcg],
+        ]),
+    ]);
+  }
+
+  const escenarioTienda = escenariosCierre(fila, datos.corte);
+  laminaTabla(pptx, "Proyección de cierre", [
+    ["Concepto", "Valor"],
+    ["Meta del período", moneda(escenarioTienda.meta)],
+    ["Acumulado", moneda(escenarioTienda.acumulado)],
+    ["Escenario conservador", moneda(escenarioTienda.conservador)],
+    ["Escenario base", moneda(escenarioTienda.base)],
+    ["Escenario optimista", moneda(escenarioTienda.optimista)],
+    ["Ritmo actual por día", moneda(escenarioTienda.ritmoActual)],
+    ["Ritmo requerido por día", moneda(escenarioTienda.ritmoRequerido)],
+    [
+      "Exigencia",
+      escenarioTienda.metaSuperada
+        ? "Meta ya cubierta"
+        : escenarioTienda.viabilidad
+          ? ETIQUETA_VIABILIDAD[escenarioTienda.viabilidad]
+          : "—",
+    ],
   ]);
 
   for (const plan of datos.planes) {

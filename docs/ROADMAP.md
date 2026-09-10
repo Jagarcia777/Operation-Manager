@@ -56,7 +56,10 @@ si algo queda a medias.
       Scorecard, escenarios de cierre, ajustes y conclusiones
 - [x] Benchmarks cargables desde Configuración (la app no inventa referencias)
 - [x] Exportación del informe ejecutivo a PowerPoint (.pptx) y Word (.docx)
-- [ ] Presentación de tienda con sus 7 secciones (hoy tiene la versión anterior, más pobre)
+- [x] Presentación de tienda con sus 7 secciones: indicadores contra zona y cadena, diagnóstico
+      con ajustes y mezcla por categoría, evolución por ritmo diario, Balanced Scorecard
+      individual, proyección con exigencia de cierre, plan de acción y conclusiones
+- [x] Exportación de la presentación de tienda a PowerPoint y Word
 - [ ] Venta diaria para el análisis por día de la semana
 
 ## Fase 7 — Cierre

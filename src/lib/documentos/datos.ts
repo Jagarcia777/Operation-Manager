@@ -52,16 +52,50 @@ export async function datosPresentacionTienda(corteId: string, tiendaId: string)
     .flatMap((zona) => zona.tiendas)
     .find((entrada) => entrada.tiendaId === tiendaId);
 
-  const planes = await prisma.planAccion.findMany({
-    where: { tiendaId, estado: { not: "CERRADO" } },
-    include: { metas: true, hitos: { orderBy: { mes: "asc" } } },
-  });
+  const zonaAnterior = tableroAnterior?.zonas.find((zona) => zona.zonaId === tienda.zonaId);
+
+  const [planes, categorias, benchmarks, umbrales, analisisGuardado] = await Promise.all([
+    prisma.planAccion.findMany({
+      where: { tiendaId, estado: { not: "CERRADO" } },
+      include: { metas: true, hitos: { orderBy: { mes: "asc" } } },
+    }),
+    prisma.registroCategoria.findMany({
+      where: { corteId, tiendaId },
+      include: { categoria: true },
+    }),
+    prisma.benchmark.findMany(),
+    prisma.umbral.findMany(),
+    prisma.analisis.findFirst({
+      where: { corteId, alcance: "CADENA" },
+      orderBy: { creadoEn: "desc" },
+    }),
+  ]);
+
+  const analisis: AnalisisCorteTipo | null = analisisGuardado
+    ? (JSON.parse(analisisGuardado.contenido) as AnalisisCorteTipo)
+    : null;
+
+  // Del análisis de la zona, lo que menciona a esta tienda por su nombre.
+  const mencionaTienda = (texto: string) =>
+    texto.toLowerCase().includes(tienda.nombre.toLowerCase());
 
   return {
     corte,
     tienda,
     zona: bloqueZona,
     fila,
+    filaAnterior: filaAnterior ?? null,
+    zonaAnterior: zonaAnterior ?? null,
+    categorias,
+    benchmarks,
+    margenMinimo: umbrales.find((umbral) => umbral.clave === "MARGEN_MIN_PCT")?.valor ?? 16,
+    hallazgos: (analisis?.hallazgos ?? []).filter(
+      (hallazgo) => mencionaTienda(hallazgo.ambito) || mencionaTienda(hallazgo.evidencia),
+    ),
+    recomendaciones: (analisis?.recomendaciones ?? []).filter(
+      (recomendacion) =>
+        mencionaTienda(recomendacion.ambito) || mencionaTienda(recomendacion.accion),
+    ),
     subtotalZona: bloqueZona?.subtotal ?? null,
     totalCadena: tablero.total,
     posicionCadena,
