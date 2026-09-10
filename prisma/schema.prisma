@@ -1,0 +1,246 @@
+// Modelo de datos de Operation Manager.
+// SQLite no soporta enums ni Json en Prisma: los campos de tipo cerrado son String y sus
+// valores válidos viven en src/lib/dominio.ts; los payloads JSON se guardan como texto.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// La URL de conexión vive en prisma.config.ts (Prisma 7).
+datasource db {
+  provider = "sqlite"
+}
+
+model Zona {
+  id       String        @id @default(cuid())
+  nombre   String        @unique
+  gerente  String
+  orden    Int           @default(0)
+  tiendas  Tienda[]
+  planes   PlanAccion[]
+  notas    NotaMemoria[]
+  perfiles Perfil[]
+}
+
+model Tienda {
+  id     String  @id @default(cuid())
+  nombre String  @unique
+  codigo String? @unique
+  activa Boolean @default(true)
+  orden  Int     @default(0)
+  zonaId String
+  zona   Zona    @relation(fields: [zonaId], references: [id], onDelete: Cascade)
+
+  // Atributos para una cadena en crecimiento: fechaApertura permite aislar las tiendas nuevas
+  // del comparativo (ventas comparables) y metrosCuadrados habilita productividad por m².
+  ciudad          String?
+  formato         String?
+  metrosCuadrados Float?
+  fechaApertura   DateTime?
+
+  ventas  RegistroVentas[]
+  ajustes RegistroAjuste[]
+  alertas Alerta[]
+  planes  PlanAccion[]
+  notas   NotaMemoria[]
+
+  @@index([zonaId])
+}
+
+model Corte {
+  id                String   @id @default(cuid())
+  nombre            String   @unique
+  tipo              String // SEMANAL | CIERRE_MES
+  fechaInicio       DateTime
+  fechaFin          DateTime
+  estado            String   @default("BORRADOR") // BORRADOR | REVISION | CERRADO
+  diasDelMes        Int?
+  diasTranscurridos Int?
+  creadoEn          DateTime @default(now())
+
+  ventas       RegistroVentas[]
+  ajustes      RegistroAjuste[]
+  alertas      Alerta[]
+  extracciones Extraccion[]
+  planes       PlanAccion[]
+  notas        NotaMemoria[]
+}
+
+model RegistroVentas {
+  id       String @id @default(cuid())
+  corteId  String
+  tiendaId String
+  corte    Corte  @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda   Tienda @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+
+  ventasMeta        Float?
+  ventasReal        Float?
+  unidadesMeta      Float?
+  unidadesReal      Float?
+  transaccionesMeta Float?
+  transaccionesReal Float?
+  margenBrutoMeta   Float? // %MB
+  margenBrutoReal   Float?
+
+  origen        String   @default("MANUAL") // MANUAL | CSV | IA
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, tiendaId])
+  @@index([tiendaId])
+}
+
+model RegistroAjuste {
+  id       String @id @default(cuid())
+  corteId  String
+  tiendaId String
+  corte    Corte  @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda   Tienda @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+
+  // MERMA | MERCANCIA_DANADA | CARGA_DESCARGA | INVENTARIO | ERRORES_VENTA
+  tipologia     String
+  monto         Float    @default(0)
+  porcentaje    Float?
+  origen        String   @default("MANUAL")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, tiendaId, tipologia])
+  @@index([tiendaId])
+}
+
+model Alerta {
+  id       String  @id @default(cuid())
+  corteId  String
+  tiendaId String?
+  corte    Corte   @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda   Tienda? @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+
+  // SUBTOTAL_DESCUADRADO | POSIBLE_INTERCAMBIO | VALOR_ATIPICO | DATO_FALTANTE | SALTO_IMPOSIBLE
+  tipo           String
+  severidad      String // ALTA | MEDIA | BAJA
+  indicador      String?
+  valorObservado Float?
+  valorEsperado  Float?
+  mensaje        String
+  estado         String   @default("ABIERTA") // ABIERTA | REVISADA | DESCARTADA
+  nota           String?
+  creadaEn       DateTime @default(now())
+
+  @@index([corteId, estado])
+  @@index([tiendaId])
+}
+
+model PlanAccion {
+  id       String  @id @default(cuid())
+  titulo   String
+  alcance  String // CADENA | ZONA | TIENDA
+  zonaId   String?
+  tiendaId String?
+  corteId  String?
+  zona     Zona?   @relation(fields: [zonaId], references: [id], onDelete: SetNull)
+  tienda   Tienda? @relation(fields: [tiendaId], references: [id], onDelete: SetNull)
+  corte    Corte?  @relation(fields: [corteId], references: [id], onDelete: SetNull)
+
+  diagnostico    String?
+  oportunidadUsd Float    @default(0)
+  estado         String   @default("BORRADOR") // BORRADOR | ACTIVO | CERRADO
+  creadoEn       DateTime @default(now())
+
+  metas MetaPlan[]
+  hitos HitoPlan[]
+
+  @@index([tiendaId])
+  @@index([zonaId])
+}
+
+model MetaPlan {
+  id            String     @id @default(cuid())
+  planId        String
+  plan          PlanAccion @relation(fields: [planId], references: [id], onDelete: Cascade)
+  indicador     String
+  valorActual   Float?
+  valorObjetivo Float?
+  unidad        String     @default("USD") // USD | UNIDADES | PORCENTAJE
+
+  @@index([planId])
+}
+
+model HitoPlan {
+  id          String     @id @default(cuid())
+  planId      String
+  plan        PlanAccion @relation(fields: [planId], references: [id], onDelete: Cascade)
+  mes         Int // 1 | 2 | 3
+  descripcion String
+  responsable String?
+  fechaLimite DateTime?
+  estado      String     @default("PENDIENTE") // PENDIENTE | EN_CURSO | COMPLETADO
+
+  @@index([planId])
+}
+
+// Umbrales del motor de alertas, editables desde la app: lo que hoy es atípico deja de serlo
+// cuando la cadena crece, y ajustarlo no debe requerir tocar código.
+model Umbral {
+  id       String   @id @default(cuid())
+  clave    String   @unique
+  etiqueta String
+  valor    Float
+  unidad   String   @default("PORCENTAJE") // PORCENTAJE | USD | FACTOR
+  nota     String?
+  editado  DateTime @updatedAt
+}
+
+// Usuario maestro único: la app se ajusta a su forma de trabajar. Una sola fila, id "maestro".
+model Perfil {
+  id           String  @id @default("maestro")
+  nombre       String
+  cargo        String
+  zonaPropiaId String?
+  zonaPropia   Zona?   @relation(fields: [zonaPropiaId], references: [id], onDelete: SetNull)
+
+  // Contexto del negocio y de su forma de trabajo, en texto libre: alimenta al cerebro analítico.
+  contexto             String?
+  instruccionesCerebro String?
+  preferencias         String? // JSON serializado
+  actualizadoEn        DateTime @updatedAt
+
+  @@index([zonaPropiaId])
+}
+
+// Memoria operativa: lo que el usuario sabe y la data no dice. Se suma al contexto del análisis.
+model NotaMemoria {
+  id       String  @id @default(cuid())
+  texto    String
+  etiqueta String? // OPERACION | PERSONAL | INVENTARIO | COMERCIAL | OTRO
+  vigente  Boolean @default(true)
+
+  tiendaId String?
+  zonaId   String?
+  corteId  String?
+  tienda   Tienda? @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  zona     Zona?   @relation(fields: [zonaId], references: [id], onDelete: Cascade)
+  corte    Corte?  @relation(fields: [corteId], references: [id], onDelete: SetNull)
+
+  creadaEn DateTime @default(now())
+
+  @@index([tiendaId])
+  @@index([zonaId])
+}
+
+model Extraccion {
+  id      String @id @default(cuid())
+  corteId String?
+  corte   Corte? @relation(fields: [corteId], references: [id], onDelete: SetNull)
+
+  archivoNombre  String
+  archivoTipo    String
+  archivoRuta    String?
+  destino        String   @default("VENTAS") // VENTAS | AJUSTES
+  estado         String   @default("PENDIENTE") // PENDIENTE | EXTRAIDO | CONFIRMADO | ERROR
+  modelo         String?
+  respuestaCruda String? // JSON serializado
+  error          String?
+  creadaEn       DateTime @default(now())
+
+  @@index([corteId])
+}
