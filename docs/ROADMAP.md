@@ -29,10 +29,11 @@ si algo queda a medias.
 
 ## Fase 3 — Tableros
 
-- [x] Tablero de Control de Ventas (por zona, con subtotales y total cadena)
+- [x] Tablero de Control de Ventas (Zona Oriente al detalle, resto de la cadena por total de zona)
 - [x] Proyección de cierre de mes
 - [x] Consolidado de Aportes
-- [x] Reporte de Ajustes por Tipología (monto y % sobre ventas)
+- [x] Reporte de Ajustes por Tipología (monto y % sobre ventas, con el signo de la fuente)
+- [x] Categorías con ranking Pareto 80/20 y clasificación BCG
 
 ## Fase 4 — Validación
 

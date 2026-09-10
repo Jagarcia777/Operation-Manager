@@ -9,6 +9,7 @@ const GRUPOS = [
     secciones: [
       { href: "/", etiqueta: "Inicio", icono: "inicio" },
       { href: "/tablero", etiqueta: "Tablero", icono: "tablero" },
+      { href: "/categorias", etiqueta: "Categorías", icono: "categorias" },
       { href: "/ajustes", etiqueta: "Ajustes", icono: "ajustes" },
       { href: "/alertas", etiqueta: "Alertas", icono: "alertas" },
     ],
@@ -36,6 +37,7 @@ const TRAZOS: Record<string, string> = {
   ajustes: "M3 6h14M3 10h14M3 14h9",
   alertas: "M10 3.5 17.5 16.5H2.5zM10 8.5v3.5M10 14.5h.01",
   analisis: "M3.5 13.5 8 9l3 3 5.5-6M12 6h4.5v4.5",
+  categorias: "M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z",
   planes: "M6 4h8a1 1 0 0 1 1 1v11l-5-2.5L5 16V5a1 1 0 0 1 1-1z",
   documentos: "M5 3h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 3v4h4",
   cargar: "M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v3h13v-3",
