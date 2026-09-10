@@ -1,69 +1,166 @@
-import Image from "next/image";
+import Link from "next/link";
+import { EstadoVacio } from "@/components/EstadoVacio";
+import { TarjetaKpi } from "@/components/TarjetaKpi";
+import { cargarTablero, resolverCorte } from "@/lib/consultas";
+import { prisma } from "@/lib/db";
+import { ETIQUETA_TIPO_ALERTA, type TipoAlerta } from "@/lib/dominio";
+import {
+  CLASES_TONO,
+  fechaCorta,
+  moneda,
+  numero,
+  porcentaje,
+  tonoCumplimiento,
+} from "@/lib/formato";
 
-export default function Home() {
+// Pantalla de inicio: gestión por excepción. Lo primero que se ve es lo que se salió de rango,
+// no las 24 tiendas en orden.
+export default async function InicioPage() {
+  const [perfil, corte] = await Promise.all([
+    prisma.perfil.findUnique({ where: { id: "maestro" } }),
+    resolverCorte(),
+  ]);
+
+  if (!corte) {
+    return (
+      <EstadoVacio mensaje="Todavía no hay cortes cargados. Empieza subiendo el Dashboard Ejecutivo en Cargar datos." />
+    );
+  }
+
+  const [tablero, alertas] = await Promise.all([
+    cargarTablero(corte.id),
+    prisma.alerta.findMany({
+      where: { corteId: corte.id, estado: "ABIERTA" },
+      include: { tienda: true },
+      orderBy: [{ severidad: "asc" }, { creadaEn: "desc" }],
+      take: 4,
+    }),
+  ]);
+
+  const abiertas = await prisma.alerta.count({
+    where: { corteId: corte.id, estado: "ABIERTA" },
+  });
+
+  const tiendas = tablero.zonas.flatMap((zona) =>
+    zona.tiendas.map((tienda) => ({ ...tienda, zona: zona.zona })),
+  );
+
+  const bajoMeta = tiendas
+    .filter((tienda) => tienda.brechaVentas !== null && tienda.brechaVentas < 0)
+    .sort((a, b) => (a.brechaVentas ?? 0) - (b.brechaVentas ?? 0))
+    .slice(0, 6);
+
+  const oportunidad = bajoMeta.reduce((total, tienda) => total + (tienda.brechaVentas ?? 0), 0);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl">Hola, {(perfil?.nombre ?? "").split(" ")[0] || "bienvenido"}</h1>
+        <p className="mt-1 text-sm text-texto-2">
+          {corte.nombre} · cerrado al {fechaCorta(corte.fechaFin)}
+        </p>
+      </header>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <TarjetaKpi
+          etiqueta="Ventas de la cadena"
+          valor={moneda(tablero.total.ventasReal)}
+          cumplimiento={tablero.total.cumplimientoVentas}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <TarjetaKpi
+          etiqueta="Brecha contra meta"
+          valor={moneda(tablero.total.brechaVentas)}
+          detalle={`${bajoMeta.length} tiendas por debajo`}
+        />
+        <TarjetaKpi
+          etiqueta="Oportunidad recuperable"
+          valor={moneda(Math.abs(oportunidad))}
+          detalle="Suma de las brechas negativas"
+        />
+        <TarjetaKpi
+          etiqueta="Alertas abiertas"
+          valor={numero(abiertas)}
+          detalle="Inconsistencias sin atender"
+        />
+      </section>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <section className="tarjeta p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Requiere tu atención</h2>
+            <Link href="/alertas" className="text-xs text-acento hover:underline">
+              Ver todas
+            </Link>
+          </div>
+          {alertas.length === 0 ? (
+            <p className="py-6 text-center text-sm text-texto-3">
+              Sin alertas abiertas en este corte.
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {alertas.map((alerta) => (
+                <li key={alerta.id} className="border-b border-borde-suave pb-2.5 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`chip ${
+                        alerta.severidad === "ALTA"
+                          ? "bg-alerta-tenue text-alerta"
+                          : "bg-atencion-tenue text-atencion"
+                      }`}
+                    >
+                      {ETIQUETA_TIPO_ALERTA[alerta.tipo as TipoAlerta] ?? alerta.tipo}
+                    </span>
+                    {alerta.tienda && (
+                      <span className="text-sm font-medium">{alerta.tienda.nombre}</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-texto-2">{alerta.mensaje}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="tarjeta p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Tiendas por debajo de meta</h2>
+            <Link href="/tablero" className="text-xs text-acento hover:underline">
+              Ver tablero
+            </Link>
+          </div>
+          {bajoMeta.length === 0 ? (
+            <p className="py-6 text-center text-sm text-texto-3">
+              Todas las tiendas cerraron en meta.
+            </p>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th className="text-left">Tienda</th>
+                  <th className="text-right">Cumpl.</th>
+                  <th className="text-right">Brecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bajoMeta.map((tienda) => (
+                  <tr key={tienda.tiendaId}>
+                    <td>
+                      {tienda.tienda}
+                      <span className="ml-2 text-xs text-texto-3">{tienda.zona}</span>
+                    </td>
+                    <td className="cifra">
+                      <span className={`chip ${CLASES_TONO[tonoCumplimiento(tienda.cumplimientoVentas)]}`}>
+                        {porcentaje(tienda.cumplimientoVentas)}
+                      </span>
+                    </td>
+                    <td className="cifra text-alerta">{moneda(tienda.brechaVentas)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

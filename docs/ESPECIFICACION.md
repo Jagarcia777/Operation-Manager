@@ -167,7 +167,28 @@ La cadena está en crecimiento, así que nada del dominio vive fijo en el códig
 | Productividad por m² y por hora-hombre | Dos indicadores clásicos que hoy faltan y que explican buena parte de la brecha entre tiendas |
 | Pantalla de inicio por excepción | Gestión por excepción: ver primero lo que se salió de rango, no las 24 tiendas en orden |
 
-## 5. Fuera de alcance por ahora
+## 5. Seguridad y privacidad
+
+La información del negocio es sensible, así que el sistema corre **en el entorno del usuario** y
+no delega sus datos a servicios de terceros.
+
+- **Todo es local**: la aplicación se ejecuta en su equipo y la base de datos es un archivo suyo
+  (`prisma/dev.db`). No hay servidor compartido, ni cuentas, ni sincronización a la nube.
+- **Solo escucha en localhost**: `npm run dev` y `npm start` se atan a `127.0.0.1`, de modo que la
+  app no queda expuesta a la red local.
+- **Sin recursos de terceros**: tipografías del sistema, nada de CDN ni fuentes remotas, y una
+  política de contenido (CSP) que restringe la app a su propio origen. Sin analítica ni telemetría.
+- **La única salida a internet es la IA, y es explícita**: la extracción del PDF/imagen y la
+  asesoría del cerebro analítico usan la API de Anthropic con la clave del propio usuario, por
+  TLS. Se envía únicamente el archivo a leer o las métricas ya calculadas del corte —nunca la base
+  completa— y esas funciones quedan inactivas si no hay clave configurada. El resto de la
+  aplicación funciona sin conexión.
+- **Credenciales fuera del repositorio**: la clave vive en `.env`, que está ignorado por git, y se
+  usa solo del lado del servidor; nunca llega al navegador.
+- **Archivos cargados**: los PDF/imágenes originales se guardan localmente en una carpeta ignorada
+  por git y pueden borrarse desde la app.
+
+## 6. Fuera de alcance por ahora
 
 - Autenticación y multiusuario: el sistema es de un solo usuario maestro por diseño.
 - Integración directa con el sistema transaccional de las tiendas.

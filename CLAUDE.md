@@ -81,6 +81,18 @@ Los tokens viven en `src/app/globals.css`; usarlos siempre en vez de valores sue
   opciones a la vista, acción principal evidente, nada de jerga técnica en la interfaz. Si algo
   se puede deducir del dato, la app lo deduce en vez de pedírselo al usuario.
 
+## Seguridad
+
+La data del negocio es sensible y la app corre en el equipo del usuario (`docs/ESPECIFICACION.md` §5).
+
+- Todo local: base SQLite propia, servidor atado a `127.0.0.1`, sin cuentas ni sincronización.
+- Sin recursos de terceros en el cliente: tipografías del sistema, CSP restringida al propio
+  origen, sin analítica. No agregar CDNs, fuentes remotas ni scripts externos.
+- La única salida a internet es la API de Anthropic, siempre desde el servidor y solo con lo
+  mínimo necesario (el archivo a extraer o las métricas ya calculadas, nunca la base completa).
+  Si falta `ANTHROPIC_API_KEY`, esas funciones se desactivan y el resto sigue operando.
+- `ANTHROPIC_API_KEY` jamás debe cruzar al cliente ni entrar en un componente marcado `"use client"`.
+
 ## Variables de entorno
 
 Copiar `.env.example` a `.env`. `ANTHROPIC_API_KEY` es obligatoria para la extracción con IA;

@@ -1,26 +1,227 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Sistema visual de Operation Manager. Referencia: Apple HIG.
+   Superficies claras, un solo acento, separadores hairline y cifras tabulares. */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --fondo: #f5f5f7;
+  --superficie: #ffffff;
+  --superficie-2: #fbfbfd;
+  --superficie-3: #f0f0f3;
+  --texto: #1d1d1f;
+  --texto-2: #6e6e73;
+  --texto-3: #86868b;
+  --borde: #d2d2d7;
+  --borde-suave: #e8e8ed;
+  --acento: #0071e3;
+  --acento-tenue: #e9f2fd;
+  --exito: #1d7f3e;
+  --exito-tenue: #e6f5eb;
+  --atencion: #9a5b00;
+  --atencion-tenue: #fdf1e0;
+  --alerta: #c9252d;
+  --alerta-tenue: #fdecec;
+  --sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --sombra-sutil: 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --fondo: #000000;
+    --superficie: #1c1c1e;
+    --superficie-2: #161618;
+    --superficie-3: #2c2c2e;
+    --texto: #f5f5f7;
+    --texto-2: #a1a1a6;
+    --texto-3: #8e8e93;
+    --borde: #38383a;
+    --borde-suave: #2a2a2c;
+    --acento: #0a84ff;
+    --acento-tenue: #10243a;
+    --exito: #4cd07d;
+    --exito-tenue: #102a1a;
+    --atencion: #ffb340;
+    --atencion-tenue: #2e2110;
+    --alerta: #ff6961;
+    --alerta-tenue: #33161a;
+    --sombra: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+    --sombra-sutil: 0 1px 2px rgb(0 0 0 / 0.4);
   }
 }
 
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-superficie-3: var(--superficie-3);
+  --color-texto: var(--texto);
+  --color-texto-2: var(--texto-2);
+  --color-texto-3: var(--texto-3);
+  --color-borde: var(--borde);
+  --color-borde-suave: var(--borde-suave);
+  --color-acento: var(--acento);
+  --color-acento-tenue: var(--acento-tenue);
+  --color-exito: var(--exito);
+  --color-exito-tenue: var(--exito-tenue);
+  --color-atencion: var(--atencion);
+  --color-atencion-tenue: var(--atencion-tenue);
+  --color-alerta: var(--alerta);
+  --color-alerta-tenue: var(--alerta-tenue);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --radius-tarjeta: 0.875rem;
+  --shadow-tarjeta: var(--sombra);
+  --shadow-sutil: var(--sombra-sutil);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+/* Toda cifra se lee en columna: mismos anchos de dígito y alineada a la derecha. */
+.cifra {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  text-align: right;
+  white-space: nowrap;
+}
+
+@layer components {
+  .tarjeta {
+    background: var(--superficie);
+    border: 1px solid var(--borde-suave);
+    border-radius: var(--radius-tarjeta);
+    box-shadow: var(--sombra-sutil);
+  }
+
+  .tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .tabla th {
+    font-weight: 500;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--texto-3);
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--borde);
+    background: var(--superficie);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .tabla td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--borde-suave);
+    color: var(--texto);
+  }
+
+  .tabla tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .fila-zona td {
+    background: var(--superficie-3);
+    font-weight: 600;
+  }
+
+  .fila-total td {
+    background: var(--superficie-3);
+    font-weight: 600;
+    border-top: 1px solid var(--borde);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 200ms ease-out;
+    cursor: pointer;
+  }
+
+  .boton-primario {
+    background: var(--acento);
+    color: #fff;
+  }
+
+  .boton-primario:hover {
+    filter: brightness(1.08);
+  }
+
+  .boton-secundario {
+    background: var(--superficie);
+    color: var(--texto);
+    border: 1px solid var(--borde);
+  }
+
+  .boton-secundario:hover {
+    background: var(--superficie-3);
+  }
+
+  .campo {
+    width: 100%;
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--texto);
+    transition: border-color 200ms ease-out;
+  }
+
+  .campo:focus {
+    outline: none;
+    border-color: var(--acento);
+    box-shadow: 0 0 0 3px var(--acento-tenue);
+  }
+}
+
+/* Los tableros y los informes se llevan impresos a las reuniones. */
+@media print {
+  .no-imprimir {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .tarjeta {
+    box-shadow: none;
+    border-color: #d2d2d7;
+    break-inside: avoid;
+  }
 }
