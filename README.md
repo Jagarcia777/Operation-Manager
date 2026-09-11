@@ -21,9 +21,8 @@ git --version
 ## Instalación
 
 ```bash
-git clone https://github.com/Jagarcia777/Operation-Manager.git
-cd Operation-Manager
-git checkout claude/zealous-sagan-8afxve
+git clone https://github.com/Jagarcia777/operationmanager.git
+cd operationmanager
 npm install
 ```
 
