@@ -68,7 +68,9 @@ si algo queda a medias.
 - [x] Identidad de marca propia con monograma configurable
 - [x] Migración de SQLite a PostgreSQL
 - [x] Documentación del despliegue
-- [ ] Desplegar en el proveedor elegido y probar desde el móvil
+- [x] Carga automática del catálogo en el primer despliegue
+- [x] Desplegado en Vercel con PostgreSQL en Neon
+- [ ] Probar desde el móvil
 
 ## Fase 8 — Cierre
 
@@ -76,6 +78,15 @@ si algo queda a medias.
 - [x] `npm run build` y `npm run lint` limpios
 - [x] Recorrido en navegador de tablero, inicio, ajustes, informe y configuración
 - [ ] Recorrido de la ingesta con IA con un documento real (requiere `ANTHROPIC_API_KEY`)
+
+## Pendiente del lado del usuario
+
+No son tareas de código: la aplicación ya las admite desde Configuración.
+
+- [ ] Nombrar las cinco zonas de comparación (hoy "Zona 2" a "Zona 6")
+- [ ] Revisar las 13 categorías; solo Carnicería salió de los reportes reales
+- [ ] Cargar los benchmarks de margen, RPT, UPT, ASP y merma
+- [ ] Cargar el primer corte real
 
 ## Ideas pendientes de aprobación
 

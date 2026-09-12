@@ -25,6 +25,7 @@ const UMBRALES_POR_DEFECTO: Record<string, number> = {
   CUMPLIMIENTO_MIN: 50,
   CUMPLIMIENTO_MAX: 150,
   AJUSTE_MAX_PCT: 1,
+  AJUSTE_MIN_PCT: 0.1,
   FACTOR_ATIPICO: 3,
   SALTO_MAX_PCT: 40,
   TOLERANCIA_SUBTOTAL: 1,
@@ -129,7 +130,11 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
       const nombre = nombrePorTienda.get(entrada.tiendaId) ?? "Tienda";
       const magnitud = Math.abs(entrada.valor);
       const superaUmbral = magnitud > umbrales.AJUSTE_MAX_PCT;
+      // La dispersión sola delata cifras que no valen la pena: cuando toda la cadena está en
+      // centésimas de punto, cualquier diferencia supera tres desviaciones y la alerta acaba
+      // diciendo que 0,01 % está "muy por encima" de 0,01 %. Debajo del piso no se levanta.
       const superaDispersion =
+        magnitud >= umbrales.AJUSTE_MIN_PCT &&
         dispersion !== null &&
         dispersion > 0 &&
         magnitud - centro > umbrales.FACTOR_ATIPICO * dispersion;
@@ -142,7 +147,7 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
           indicador: tipologia,
           valorObservado: Number(entrada.valor.toFixed(2)),
           valorEsperado: Number(centro.toFixed(2)),
-          mensaje: `${nombre} registra ${entrada.valor.toFixed(2)} % de ventas en ${ETIQUETA_TIPOLOGIA[tipologia as Tipologia]}, muy por encima de la mediana de la cadena (${centro.toFixed(2)} %). Confirmar si es real o un error de registro.`,
+          mensaje: `${nombre} registra un ajuste de ${entrada.valor.toFixed(2)} % sobre ventas en ${ETIQUETA_TIPOLOGIA[tipologia as Tipologia]}, frente a una mediana de cadena de ${centro.toFixed(2)} %. Confirmar si es real o un error de registro.`,
         });
       }
     }
@@ -154,25 +159,41 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
     orderBy: { fechaFin: "desc" },
   });
 
-  if (anterior) {
-    const previos = await prisma.registroVentas.findMany({ where: { corteId: anterior.id } });
-    const previoPorTienda = new Map(previos.map((registro) => [registro.tiendaId, registro]));
+  // Dos cortes acumulados no cubren los mismos días: comparar los totales mide días
+  // transcurridos, no desempeño —un corte al 23 lleva de suyo mucho más que uno al 12—.
+  // Se compara la venta por día. Si no se sabe cuántos días cubre alguno de los dos,
+  // no se compara: levantar una alerta sobre una base inventada es peor que no levantarla.
+  const diasDe = (c: { diasTranscurridos: number | null; diasDelMes: number | null }) =>
+    c.diasTranscurridos ?? c.diasDelMes ?? null;
 
-    for (const registro of ventas) {
-      const previo = previoPorTienda.get(registro.tiendaId);
-      if (!registro.ventasReal || !previo?.ventasReal) continue;
-      const variacion = ((registro.ventasReal - previo.ventasReal) / previo.ventasReal) * 100;
-      if (Math.abs(variacion) > umbrales.SALTO_MAX_PCT) {
-        const nombre = nombrePorTienda.get(registro.tiendaId) ?? "Tienda";
-        alertas.push({
-          tipo: "SALTO_IMPOSIBLE",
-          severidad: "MEDIA",
-          tiendaId: registro.tiendaId,
-          indicador: "ventas",
-          valorObservado: Number(variacion.toFixed(1)),
-          valorEsperado: umbrales.SALTO_MAX_PCT,
-          mensaje: `${nombre} varía ${variacion.toFixed(1)} % en ventas contra ${anterior.nombre}. Verificar el dato antes de leerlo como tendencia.`,
-        });
+  if (anterior) {
+    const diasAhora = diasDe(corte);
+    const diasAntes = diasDe(anterior);
+
+    if (diasAhora && diasAntes) {
+      const previos = await prisma.registroVentas.findMany({ where: { corteId: anterior.id } });
+      const previoPorTienda = new Map(previos.map((registro) => [registro.tiendaId, registro]));
+
+      for (const registro of ventas) {
+        const previo = previoPorTienda.get(registro.tiendaId);
+        if (!registro.ventasReal || !previo?.ventasReal) continue;
+
+        const ahora = registro.ventasReal / diasAhora;
+        const antes = previo.ventasReal / diasAntes;
+        const variacion = ((ahora - antes) / antes) * 100;
+
+        if (Math.abs(variacion) > umbrales.SALTO_MAX_PCT) {
+          const nombre = nombrePorTienda.get(registro.tiendaId) ?? "Tienda";
+          alertas.push({
+            tipo: "SALTO_IMPOSIBLE",
+            severidad: "MEDIA",
+            tiendaId: registro.tiendaId,
+            indicador: "ventas",
+            valorObservado: Number(variacion.toFixed(1)),
+            valorEsperado: umbrales.SALTO_MAX_PCT,
+            mensaje: `${nombre} varía ${variacion.toFixed(1)} % en venta por día contra ${anterior.nombre}. Verificar el dato antes de leerlo como tendencia.`,
+          });
+        }
       }
     }
   }
