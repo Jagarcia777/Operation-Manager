@@ -62,7 +62,8 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
 
       {!hayClaveIA() && (
         <div className="tarjeta bg-atencion-tenue px-4 py-3 text-sm text-atencion">
-          Configura <code>ANTHROPIC_API_KEY</code> en <code>.env</code> para habilitar el análisis.
+          Falta <code>ANTHROPIC_API_KEY</code> en las variables de entorno. Sin ella el análisis
+          queda desactivado; el resto de la aplicación funciona igual.
         </div>
       )}
 

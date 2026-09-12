@@ -52,8 +52,8 @@ export default async function CargarPage() {
 
       {!conClave && (
         <div className="tarjeta border-atencion-tenue bg-atencion-tenue px-4 py-3 text-sm text-atencion">
-          Falta configurar <code>ANTHROPIC_API_KEY</code> en el archivo <code>.env</code>. Sin
-          ella la lectura automática queda desactivada; el resto de la aplicación funciona igual.
+          Falta <code>ANTHROPIC_API_KEY</code> en las variables de entorno. Sin ella la lectura
+          automática queda desactivada; el resto de la aplicación funciona igual.
         </div>
       )}
 
