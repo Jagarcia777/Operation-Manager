@@ -2,6 +2,7 @@ import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
+import { GraficoPareto } from "@/components/graficos/GraficoPareto";
 import { analizarCategorias, consolidarCategorias } from "@/lib/categorias";
 import { cargarTiendas, listarCortes, resolverCorte } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
@@ -43,6 +44,7 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
 
   const analisis = analizarCategorias(consolidarCategorias(registros));
   const tiendaActual = tiendas.find((tienda) => tienda.id === tiendaId);
+  const ambito = nombreDelAmbito(tiendas);
 
   const porClase = (clase: ClaseBcg) =>
     analisis.filas.filter((fila) => fila.claseBcg === clase).length;
@@ -55,7 +57,7 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         <TarjetaKpi
           etiqueta="Venta analizada"
           valor={moneda(analisis.ventaTotal)}
-          detalle={tiendaActual ? tiendaActual.nombre : "Toda Zona Oriente"}
+          detalle={tiendaActual ? tiendaActual.nombre : ambito}
         />
         <TarjetaKpi
           etiqueta="Margen de la mezcla"
@@ -87,6 +89,23 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
             </p>
           </div>
         ))}
+      </section>
+
+      <section className="tarjeta p-4">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Dónde está la venta</h2>
+          <span className="text-xs text-texto-3">
+            La línea marca el 80 % acumulado: a su izquierda, lo vital
+          </span>
+        </div>
+        <GraficoPareto
+          barras={analisis.filas.map((fila) => ({
+            etiqueta: fila.categoria,
+            valor: fila.ventasReal ?? 0,
+            acumulado: fila.acumulado ?? 0,
+            vital: fila.zonaPareto === "VITAL",
+          }))}
+        />
       </section>
 
       <div className="tarjeta overflow-x-auto">
@@ -143,9 +162,10 @@ function Encabezado({
 }: {
   corte: { id: string; nombre: string };
   cortes: { id: string; nombre: string }[];
-  tiendas: { id: string; nombre: string }[];
+  tiendas: { id: string; nombre: string; zona?: { nombre: string } }[];
   tiendaId: string;
 }) {
+  const ambito = nombreDelAmbito(tiendas);
   return (
     <>
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -164,7 +184,7 @@ function Encabezado({
           href={`/categorias?corte=${corte.id}`}
           className={`chip ${!tiendaId ? "bg-acento-tenue text-acento" : "bg-superficie-3 text-texto-2"}`}
         >
-          Toda Zona Oriente
+          {ambito}
         </Link>
         {tiendas.map((tienda) => (
           <Link
@@ -182,4 +202,10 @@ function Encabezado({
       </nav>
     </>
   );
+}
+
+/** "Toda Zona Metropolitana", o lo que se llame la zona que se está gestionando. */
+function nombreDelAmbito(tiendas: { zona?: { nombre: string } }[]): string {
+  const zona = tiendas[0]?.zona?.nombre;
+  return zona ? `Toda ${zona}` : "Todas las tiendas";
 }

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { generarDemo, vaciarDatos } from "@/lib/demo";
 import { ESTADOS_CORTE, TIPOS_CORTE, type EstadoCorte, type TipoCorte } from "@/lib/dominio";
 
 function texto(formData: FormData, campo: string) {
@@ -169,4 +171,46 @@ export async function archivarNota(formData: FormData) {
   if (!id) return;
   await prisma.notaMemoria.update({ where: { id }, data: { vigente: false } });
   refrescar();
+}
+
+/**
+ * Zona de riesgo. Las dos acciones borran todo lo cargado, así que exigen escribir la palabra
+ * de confirmación: un clic accidental no puede vaciar un año de cortes.
+ */
+export async function cargarDatosDemo(formData: FormData) {
+  exigirConfirmacion(formData, "DEMO");
+  await generarDemo(prisma);
+  revalidarTodo();
+  redirect("/?demo=cargado");
+}
+
+export async function vaciarAplicacion(formData: FormData) {
+  exigirConfirmacion(formData, "BORRAR");
+  await vaciarDatos(prisma);
+  revalidarTodo();
+  redirect("/configuracion?seccion=datos&hecho=vaciado");
+}
+
+function exigirConfirmacion(formData: FormData, palabra: string) {
+  const escrito = String(formData.get("confirmacion") ?? "").trim().toUpperCase();
+  if (escrito !== palabra) {
+    throw new Error(`Para continuar hay que escribir ${palabra} en la casilla de confirmación.`);
+  }
+}
+
+function revalidarTodo() {
+  for (const ruta of [
+    "/",
+    "/tablero",
+    "/ajustes",
+    "/categorias",
+    "/alertas",
+    "/analisis",
+    "/planes",
+    "/documentos",
+    "/cargar",
+    "/configuracion",
+  ]) {
+    revalidatePath(ruta);
+  }
 }

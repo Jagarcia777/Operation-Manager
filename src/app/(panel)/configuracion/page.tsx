@@ -5,6 +5,8 @@ import { ESTADOS_CORTE, ETIQUETA_ESTADO_CORTE, ETIQUETA_TIPO_CORTE, TIPOS_CORTE 
 import { fechaCorta } from "@/lib/formato";
 import {
   agregarNota,
+  cargarDatosDemo,
+  vaciarAplicacion,
   archivarNota,
   cambiarEstadoCorte,
   crearCorte,
@@ -23,6 +25,7 @@ const SECCIONES = [
   { clave: "umbrales", etiqueta: "Umbrales de alerta" },
   { clave: "benchmarks", etiqueta: "Benchmarks" },
   { clave: "memoria", etiqueta: "Memoria operativa" },
+  { clave: "datos", etiqueta: "Datos" },
 ];
 
 function paraInput(fecha: Date | null | undefined) {
@@ -56,7 +59,8 @@ export default async function ConfiguracionPage({ searchParams }: PageProps<"/co
       {seccion === "umbrales" && <SeccionUmbrales />}
       {seccion === "benchmarks" && <SeccionBenchmarks />}
       {seccion === "memoria" && <SeccionMemoria />}
-      {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria"].includes(seccion) && (
+      {seccion === "datos" && <SeccionDatos />}
+      {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria", "datos"].includes(seccion) && (
         <SeccionPerfil />
       )}
     </div>
@@ -537,6 +541,76 @@ async function SeccionMemoria() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+async function SeccionDatos() {
+  const [cortes, tiendas, registros] = await Promise.all([
+    prisma.corte.count(),
+    prisma.tienda.count(),
+    prisma.registroVentas.count(),
+  ]);
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="tarjeta p-5">
+        <h2 className="text-sm font-semibold">Lo que hay cargado ahora</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {[
+            { etiqueta: "Cortes", valor: cortes },
+            { etiqueta: "Tiendas", valor: tiendas },
+            { etiqueta: "Registros de venta", valor: registros },
+          ].map((dato) => (
+            <div key={dato.etiqueta} className="rounded-lg bg-superficie-2 px-4 py-3">
+              <p className="text-xs text-texto-3">{dato.etiqueta}</p>
+              <p className="text-xl font-semibold tabular-nums">{dato.valor}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <form action={cargarDatosDemo} className="tarjeta space-y-3 p-5">
+        <h2 className="text-sm font-semibold">Cargar datos de demostración</h2>
+        <p className="text-sm text-texto-2">
+          Borra todo lo que haya y deja la aplicación con una cadena inventada: seis tiendas, un
+          año completo de cierres de mes, categorías, ajustes por tipología y planes de acción.
+          Sirve para recorrer la herramienta llena antes de meter tus números.
+        </p>
+        <p className="text-sm text-alerta">
+          Esto elimina los datos actuales. No hay forma de recuperarlos.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block text-sm">
+            <span className="text-texto-2">
+              Escribe <strong>DEMO</strong> para confirmar
+            </span>
+            <input name="confirmacion" className="campo mt-1.5 w-40" autoComplete="off" required />
+          </label>
+          <button type="submit" className="boton boton-primario">
+            Cargar demostración
+          </button>
+        </div>
+      </form>
+
+      <form action={vaciarAplicacion} className="tarjeta space-y-3 border-alerta-tenue p-5">
+        <h2 className="text-sm font-semibold text-alerta">Vaciar la aplicación</h2>
+        <p className="text-sm text-texto-2">
+          Deja la base sin cortes, sin tiendas y sin perfil, lista para empezar de cero. Las tablas
+          se quedan como están: no se toca la estructura, solo el contenido.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block text-sm">
+            <span className="text-texto-2">
+              Escribe <strong>BORRAR</strong> para confirmar
+            </span>
+            <input name="confirmacion" className="campo mt-1.5 w-40" autoComplete="off" required />
+          </label>
+          <button type="submit" className="boton boton-secundario text-alerta">
+            Vaciar todo
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

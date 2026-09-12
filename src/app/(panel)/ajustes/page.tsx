@@ -3,6 +3,7 @@ import { Pestanas } from "@/components/Pestanas";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TablaZonas, type ColumnaTabla } from "@/components/TablaZonas";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
+import { GraficoComposicion } from "@/components/graficos/GraficoComposicion";
 import type { FilaAjustes } from "@/lib/calculos";
 import { cargarAjustes, listarCortes, resolverCorte } from "@/lib/consultas";
 import { ETIQUETA_TIPOLOGIA, TIPOLOGIAS } from "@/lib/dominio";
@@ -78,6 +79,16 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
           etiqueta="Ventas del corte"
           valor={moneda(ajustes.total.ventasReal)}
           detalle="Base de todos los porcentajes"
+        />
+      </section>
+
+      <section className="tarjeta p-4">
+        <h2 className="mb-3 text-sm font-semibold">En qué se va el ajuste</h2>
+        <GraficoComposicion
+          porciones={TIPOLOGIAS.map((tipologia) => ({
+            etiqueta: ETIQUETA_TIPOLOGIA[tipologia],
+            valor: ajustes.total.montos[tipologia] ?? 0,
+          }))}
         />
       </section>
 

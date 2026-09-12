@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
-import { cargarTablero, resolverCorte } from "@/lib/consultas";
+import { GraficoBarras } from "@/components/graficos/GraficoBarras";
+import { GraficoEvolucion } from "@/components/graficos/GraficoEvolucion";
+import { Minigrafico } from "@/components/graficos/Minigrafico";
+import { cargarTablero, resolverCorte, serieMensual } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { ETIQUETA_TIPO_ALERTA, type TipoAlerta } from "@/lib/dominio";
 import {
@@ -27,7 +30,7 @@ export default async function InicioPage() {
     );
   }
 
-  const [tablero, alertas] = await Promise.all([
+  const [tablero, alertas, serie, abiertas] = await Promise.all([
     cargarTablero(corte.id),
     prisma.alerta.findMany({
       where: { corteId: corte.id, estado: "ABIERTA" },
@@ -35,11 +38,9 @@ export default async function InicioPage() {
       orderBy: [{ severidad: "asc" }, { creadaEn: "desc" }],
       take: 4,
     }),
+    serieMensual(12),
+    prisma.alerta.count({ where: { corteId: corte.id, estado: "ABIERTA" } }),
   ]);
-
-  const abiertas = await prisma.alerta.count({
-    where: { corteId: corte.id, estado: "ABIERTA" },
-  });
 
   const tiendas = tablero.zonas.flatMap((zona) =>
     zona.tiendas.map((tienda) => ({ ...tienda, zona: zona.zona })),
@@ -66,6 +67,7 @@ export default async function InicioPage() {
           etiqueta="Ventas de la cadena"
           valor={moneda(tablero.total.ventasReal)}
           cumplimiento={tablero.total.cumplimientoVentas}
+          grafico={<Minigrafico valores={serie.map((punto) => punto.ventasReal)} />}
         />
         <TarjetaKpi
           etiqueta="Brecha contra meta"
@@ -81,6 +83,38 @@ export default async function InicioPage() {
           etiqueta="Alertas abiertas"
           valor={numero(abiertas)}
           detalle="Inconsistencias sin atender"
+        />
+      </section>
+
+      {serie.length >= 2 && (
+        <section className="tarjeta p-4">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Cómo viene el año</h2>
+            <span className="text-xs text-texto-3">
+              Últimos {serie.length} cierres de mes de la zona
+            </span>
+          </div>
+          <GraficoEvolucion
+            puntos={serie.map((punto) => ({
+              etiqueta: punto.etiqueta,
+              meta: punto.ventasMeta,
+              real: punto.ventasReal,
+            }))}
+          />
+        </section>
+      )}
+
+      <section className="tarjeta p-4">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Meta contra real, tienda por tienda</h2>
+          <span className="text-xs text-texto-3">{corte.nombre}</span>
+        </div>
+        <GraficoBarras
+          barras={tiendas.map((tienda) => ({
+            etiqueta: tienda.tienda,
+            meta: tienda.ventasMeta,
+            real: tienda.ventasReal,
+          }))}
         />
       </section>
 

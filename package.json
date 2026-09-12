@@ -11,6 +11,7 @@
     "postinstall": "prisma generate && (next telemetry disable || true)",
     "db:seed": "prisma db seed",
     "db:catalogo": "tsx prisma/seed.ts --solo-catalogo",
+    "db:demo": "tsx prisma/cargar-demo.ts",
     "db:reset": "prisma migrate reset --force",
     "auth:hash": "tsx scripts/hash-contrasena.ts"
   },

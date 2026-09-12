@@ -113,11 +113,31 @@ export function BarraLateral({
         </div>
       ))}
 
-      <div className="mt-auto hidden border-t border-borde-suave px-3 pt-4 md:block">
-        <p className="text-sm font-medium">{usuario}</p>
-        <p className="text-xs text-texto-3">{cargo}</p>
-        <form action={salir} className="mt-2">
-          <button type="submit" className="text-xs text-texto-3 hover:text-texto">
+      {/* En móvil la barra es una fila que se desplaza, así que salir va al final de esa fila:
+          antes el bloque llevaba `hidden md:block` y desde el teléfono no había forma de cerrar
+          la sesión. En escritorio se queda abajo, con el nombre encima. */}
+      <div className="mt-auto flex shrink-0 items-center gap-2 md:block md:border-t md:border-borde-suave md:px-3 md:pt-4">
+        <div className="hidden md:block">
+          <p className="text-sm font-medium">{usuario}</p>
+          <p className="text-xs text-texto-3">{cargo}</p>
+        </div>
+        <form action={salir} className="md:mt-2.5">
+          <button
+            type="submit"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm whitespace-nowrap text-texto-2 transition-colors duration-200 hover:bg-alerta-tenue hover:text-alerta md:w-full md:justify-start md:border md:border-borde-suave md:py-1.5"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-[18px] shrink-0"
+              aria-hidden
+            >
+              <path d="M12.5 6V4.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V14M9 10h7.5m0 0-2.5-2.5M16.5 10 14 12.5" />
+            </svg>
             Cerrar sesión
           </button>
         </form>

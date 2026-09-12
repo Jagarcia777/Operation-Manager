@@ -79,6 +79,14 @@ si algo queda a medias.
 - [x] Recorrido en navegador de tablero, inicio, ajustes, informe y configuración
 - [ ] Recorrido de la ingesta con IA con un documento real (requiere `ANTHROPIC_API_KEY`)
 
+## Fase 9 — Presentación
+
+- [x] Generador de demostración: cadena inventada con un año de cierres de mes
+- [x] Gráficos de indicadores en SVG propio, sin librerías de terceros
+- [x] Cerrar sesión visible también en móvil
+- [x] Siluetas de carga para que el cambio de pestaña sea inmediato
+- [x] Paleta y botones alineados a los valores de Apple
+
 ## Pendiente del lado del usuario
 
 No son tareas de código: la aplicación ya las admite desde Configuración.

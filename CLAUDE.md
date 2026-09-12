@@ -26,6 +26,7 @@ npm run build           # build de producción (verificación obligatoria antes 
 npm run lint            # eslint
 npx prisma migrate dev  # crear/aplicar migración tras editar el schema
 npx prisma db seed      # cargar zonas, tiendas y datos de ejemplo
+npm run db:demo         # cadena de demostración con un año de historia
 npx prisma studio       # inspeccionar la base de datos
 ```
 
@@ -43,6 +44,8 @@ src/lib/analisis/         cerebro analítico: evidencia determinista + asesoría
 src/lib/extraccion/       ingesta con IA de PDF/imagen
 src/lib/documentos/       generación de PPTX/DOCX
 src/components/           componentes compartidos de UI
+src/components/graficos/  gráficos en SVG propio (sin librerías: no se cargan terceros)
+src/lib/demo.ts           generador de la cadena de demostración
 ```
 
 ## Convenciones
