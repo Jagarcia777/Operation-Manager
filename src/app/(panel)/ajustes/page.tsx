@@ -43,10 +43,12 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
     },
   ];
 
+  // Los ajustes vienen en negativo por ser en contra, así que el de mayor impacto es el de
+  // mayor magnitud: ordenar por el número con signo coronaba a la única tipología a favor.
   const mayor = TIPOLOGIAS.map((tipologia) => ({
     tipologia,
     monto: ajustes.total.montos[tipologia] ?? 0,
-  })).sort((a, b) => b.monto - a.monto)[0];
+  })).sort((a, b) => Math.abs(b.monto) - Math.abs(a.monto))[0];
 
   return (
     <div className="space-y-6">
