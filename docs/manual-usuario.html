@@ -1,0 +1,973 @@
+<title>Manual de Operation Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Los tokens salen del sistema visual de la propia aplicación (src/app/globals.css):
+     el manual tiene que sentirse parte del producto, no un documento aparte. */
+  :root {
+    --ground: #f5f5f7;
+    --surface: #ffffff;
+    --surface-2: #fbfbfd;
+    --sunken: #ededf0;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --ink-3: #86868b;
+    --rule: #d2d2d7;
+    --rule-soft: #e3e3e8;
+    --accent: #0071e3;
+    --accent-link: #0066cc;
+    --accent-wash: #eaf3fd;
+    --ok: #008009;
+    --ok-wash: #e4f5e7;
+    --warn: #b25000;
+    --warn-wash: #fdf1e4;
+    --stop: #e30000;
+    --stop-wash: #fdeaea;
+    --code-bg: #1d1d1f;
+    --code-ink: #f5f5f7;
+    --code-dim: #9a9aa0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI",
+      system-ui, "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #000000;
+      --surface: #1d1d1f;
+      --surface-2: #161617;
+      --sunken: #101011;
+      --ink: #f5f5f7;
+      --ink-2: #a1a1a6;
+      --ink-3: #8e8e93;
+      --rule: #38383a;
+      --rule-soft: #2a2a2c;
+      --accent: #2997ff;
+      --accent-link: #2997ff;
+      --accent-wash: #10243a;
+      --ok: #30d158;
+      --ok-wash: #102a1a;
+      --warn: #ff9f0a;
+      --warn-wash: #2c2008;
+      --stop: #ff453a;
+      --stop-wash: #33151a;
+      --code-bg: #0d0d0e;
+      --code-ink: #f5f5f7;
+      --code-dim: #7d7d84;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #000000;
+    --surface: #1d1d1f;
+    --surface-2: #161617;
+    --sunken: #101011;
+    --ink: #f5f5f7;
+    --ink-2: #a1a1a6;
+    --ink-3: #8e8e93;
+    --rule: #38383a;
+    --rule-soft: #2a2a2c;
+    --accent: #2997ff;
+    --accent-link: #2997ff;
+    --accent-wash: #10243a;
+    --ok: #30d158;
+    --ok-wash: #102a1a;
+    --warn: #ff9f0a;
+    --warn-wash: #2c2008;
+    --stop: #ff453a;
+    --stop-wash: #33151a;
+    --code-bg: #0d0d0e;
+    --code-ink: #f5f5f7;
+    --code-dim: #7d7d84;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    padding-block: 0 96px;
+    padding-inline: 20px;
+  }
+
+  .hoja {
+    max-width: 1020px;
+    margin: 0 auto;
+    display: grid;
+    /* minmax(0, 1fr) y no 1fr: un ítem de grid no encoge por debajo del ancho mínimo de su
+       contenido, y la tabla de ejemplo empujaba la página a 954px en un teléfono de 390. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  main { min-width: 0; }
+
+  @media (min-width: 1040px) {
+    .hoja { grid-template-columns: 196px minmax(0, 1fr); gap: 52px; align-items: start; }
+  }
+
+  /* ── Índice lateral ─────────────────────────────────────────────── */
+  .indice { display: none; }
+
+  @media (min-width: 1040px) {
+    .indice {
+      display: block;
+      position: sticky;
+      top: 32px;
+      padding-top: 96px;
+    }
+  }
+
+  .indice p {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+  }
+
+  .indice ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+
+  .indice a {
+    display: block;
+    padding: 5px 10px;
+    margin-inline: -10px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    text-decoration: none;
+    transition: background-color 180ms ease-out, color 180ms ease-out;
+  }
+
+  .indice a:hover { background: var(--surface); color: var(--ink); }
+
+  /* ── Portada ────────────────────────────────────────────────────── */
+  .portada { padding-block: 88px 0; }
+
+  .marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 30px;
+  }
+
+  .squircle {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: var(--ground);
+    display: grid; place-items: center;
+    font-size: 16px; font-weight: 600; letter-spacing: -0.05em;
+  }
+
+  .marca span {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  h1 {
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 600;
+    letter-spacing: -0.032em;
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .entradilla {
+    font-size: clamp(17px, 2.2vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 40ch;
+    margin: 18px 0 0;
+    text-wrap: pretty;
+  }
+
+  /* ── Secciones ──────────────────────────────────────────────────── */
+  section { padding-top: 72px; scroll-margin-top: 24px; }
+
+  h2 {
+    font-size: clamp(24px, 3.4vw, 31px);
+    font-weight: 600;
+    letter-spacing: -0.024em;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: 17.5px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    margin: 36px 0 8px;
+  }
+
+  .rotulo {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  p, li { max-width: 68ch; text-wrap: pretty; }
+  p { margin: 0 0 16px; }
+
+  a { color: var(--accent-link); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+  strong { font-weight: 600; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--sunken);
+    padding: 1px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+
+  ul { margin: 0 0 16px; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--ink-3); }
+
+  /* ── Tarjetas ───────────────────────────────────────────────────── */
+  .tarjeta {
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+
+  .tarjeta h3 { margin-top: 0; }
+  .tarjeta > :last-child { margin-bottom: 0; }
+
+  /* ── Pasos: el ciclo del corte es una secuencia real ────────────── */
+  .pasos { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 0; }
+
+  .paso {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 18px;
+    padding: 22px 0;
+    border-top: 1px solid var(--rule-soft);
+    max-width: none;
+  }
+
+  .paso:last-child { border-bottom: 1px solid var(--rule-soft); }
+
+  .paso-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    padding-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .paso h3 { margin: 0 0 6px; }
+  .paso p { margin-bottom: 0; }
+  .paso p + p { margin-top: 12px; }
+
+  /* ── Avisos ─────────────────────────────────────────────────────── */
+  .aviso {
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin: 24px 0;
+    font-size: 15px;
+    border: 1px solid transparent;
+  }
+
+  .aviso p { margin-bottom: 0; max-width: 64ch; }
+  .aviso p + p { margin-top: 10px; }
+  .aviso strong { display: block; margin-bottom: 3px; }
+
+  .aviso-clave { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .aviso-clave strong { color: var(--accent); }
+
+  .aviso-ojo { background: var(--warn-wash); border-color: color-mix(in srgb, var(--warn) 20%, transparent); }
+  .aviso-ojo strong { color: var(--warn); }
+
+  .aviso-alto { background: var(--stop-wash); border-color: color-mix(in srgb, var(--stop) 20%, transparent); }
+  .aviso-alto strong { color: var(--stop); }
+
+  /* ── Tablas de especificación ───────────────────────────────────── */
+  .envoltorio { overflow-x: auto; margin: 20px 0 8px; border-radius: 14px; border: 1px solid var(--rule-soft); background: var(--surface); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.campo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  td.tipo { color: var(--ink-3); font-size: 13px; white-space: nowrap; }
+
+  .pie-tabla { font-size: 13.5px; color: var(--ink-3); margin: 0 0 24px; max-width: 66ch; }
+
+  /* ── Ejemplo de tablero ─────────────────────────────────────────── */
+  .ejemplo table { font-family: var(--mono); font-size: 12.5px; }
+  .ejemplo td { padding: 9px 14px; white-space: nowrap; }
+  .ejemplo thead th { padding: 11px 14px; }
+  .ejemplo .cifra { text-align: right; font-variant-numeric: tabular-nums; }
+  .ejemplo .subtotal td { background: var(--surface-2); font-weight: 600; }
+  .ejemplo .total td { background: var(--sunken); font-weight: 600; border-top: 1px solid var(--rule); }
+
+  /* ── Bloque de prompt ───────────────────────────────────────────── */
+  .prompt {
+    background: var(--code-bg);
+    border-radius: 18px;
+    overflow: hidden;
+    margin: 24px 0 12px;
+  }
+
+  .prompt-barra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 13px 18px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.09);
+  }
+
+  .prompt-barra span {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--code-dim);
+  }
+
+  .copiar {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--code-ink);
+    background: rgb(255 255 255 / 0.11);
+    border: 0;
+    border-radius: 980px;
+    padding: 6px 15px;
+    cursor: pointer;
+    transition: background-color 180ms ease-out, transform 120ms ease-out;
+  }
+
+  .copiar:hover { background: rgb(255 255 255 / 0.19); }
+  .copiar:active { transform: scale(0.96); }
+  .copiar:focus-visible { outline: 2px solid var(--code-ink); outline-offset: 2px; }
+
+  .prompt pre {
+    margin: 0;
+    padding: 22px 20px 26px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.72;
+    color: var(--code-ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ── Referencia de pantallas ────────────────────────────────────── */
+  .pantallas { display: grid; gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); border-radius: 14px; overflow: hidden; margin: 22px 0; }
+  .pantalla { background: var(--surface); padding: 16px 20px; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; }
+  .pantalla dt { font-weight: 600; font-size: 15px; }
+  .pantalla dd { margin: 0; color: var(--ink-2); font-size: 14.5px; max-width: 62ch; }
+
+  @media (max-width: 620px) {
+    .pantalla { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* ── Cierre ─────────────────────────────────────────────────────── */
+  .cierre {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-size: 13.5px;
+    color: var(--ink-3);
+  }
+
+  .cierre p { max-width: 66ch; margin-bottom: 8px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; font-size: 11.5px; }
+    .indice, .copiar { display: none; }
+    .hoja { grid-template-columns: 1fr; max-width: none; }
+    section { padding-top: 32px; break-inside: avoid; }
+    .tarjeta, .envoltorio, .prompt { break-inside: avoid; }
+    .prompt { background: #f2f2f4; }
+    .prompt pre { color: #1d1d1f; }
+    .prompt-barra span { color: #6e6e73; }
+  }
+</style>
+
+<div class="hoja">
+
+  <nav class="indice" aria-label="Secciones">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#que-hace">Qué hace</a></li>
+      <li><a href="#configuracion">Antes de empezar</a></li>
+      <li><a href="#ciclo">El ciclo de cada corte</a></li>
+      <li><a href="#pantallas">Las pantallas</a></li>
+      <li><a href="#formato">Formato del tablero</a></li>
+      <li><a href="#ajustes">Formato de ajustes</a></li>
+      <li><a href="#prompt">Prompt para tu agente</a></li>
+      <li><a href="#problemas">Si algo no sale</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <header class="portada">
+      <div class="marca">
+        <div class="squircle" aria-hidden="true">OM</div>
+        <span>Operation Manager</span>
+      </div>
+      <h1>Manual de uso</h1>
+      <p class="entradilla">
+        Cómo cargar un corte, qué mira la aplicación cuando lo lee, y cómo darle a tus
+        reportes la forma que mejor entiende.
+      </p>
+    </header>
+
+    <section id="que-hace">
+      <p class="rotulo">Punto de partida</p>
+      <h2>Qué hace y qué no</h2>
+      <p>
+        Operation Manager mantiene el Tablero de Control de Ventas y el Reporte de Ajustes por
+        Tipología corte a corte. Lee los documentos que ya produces, valida las cifras contra
+        el resto de la cadena, marca lo que no cuadra y convierte los números en informes
+        ejecutivos, presentaciones de tienda y planes de acción.
+      </p>
+
+      <div class="aviso aviso-clave">
+        <strong>La regla que gobierna todo lo demás</strong>
+        <p>
+          La aplicación nunca inventa un número ni corrige uno en silencio. Si una celda no se
+          lee con certeza, queda vacía y se anota. Si un subtotal impreso no coincide con la
+          suma de las tiendas, se levanta una alerta con los dos valores. Decidir qué está bien
+          es tuyo; la aplicación solo se asegura de que lo veas.
+        </p>
+      </div>
+
+      <p>
+        Eso tiene una consecuencia práctica: vas a ver huecos y alertas. No son fallos de la
+        herramienta, son el trabajo que antes hacías a mano y que ahora aparece señalado.
+      </p>
+    </section>
+
+    <section id="configuracion">
+      <p class="rotulo">Una sola vez</p>
+      <h2>Antes de empezar</h2>
+      <p>
+        Hay tres cosas que conviene dejar puestas antes del primer corte. Se hacen una vez y
+        deciden la calidad de todo lo que venga después.
+      </p>
+
+      <h3>1. Tus tiendas, y sobre todo sus alias</h3>
+      <p>
+        En <strong>Configuración → Zonas y tiendas</strong>. Cada tienda tiene un campo de
+        alias: ahí van todos los nombres con los que aparece en tus reportes, uno por línea.
+        Una misma sucursal suele viajar con nombres distintos según de dónde salga el
+        documento.
+      </p>
+
+      <div class="envoltorio">
+        <table>
+          <thead>
+            <tr><th>Nombre oficial</th><th>Alias que conviene cargar</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="campo">Plaza Mayor</td>
+              <td class="campo">Plaza Mayor<br>SUC. LECHERIA<br>Lechería</td>
+            </tr>
+            <tr>
+              <td class="campo">Maturín Tipuro</td>
+              <td class="campo">Tipuro<br>Maturin Tipuro<br>MAT-TIP</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="pie-tabla">
+        La aplicación empareja por nombre oficial, por código y por cualquiera de esos alias.
+        Lo que no empareja con certeza no lo adivina: te lo deja marcado para que lo asignes a
+        mano. Cada vez que eso pase, agrega ese nombre como alias y no vuelve a pasar.
+      </p>
+
+      <h3>2. Tus benchmarks</h3>
+      <p>
+        En <strong>Configuración → Benchmarks</strong>: margen bruto, ticket promedio, unidades
+        por transacción, precio medio y merma. Son las referencias contra las que se pinta cada
+        semáforo. Si los dejas vacíos, la aplicación no se inventa una referencia: deja la
+        columna en blanco y lo dice.
+      </p>
+
+      <h3>3. Tus umbrales de alerta</h3>
+      <p>
+        En <strong>Configuración → Umbrales</strong>. Definen a partir de qué punto un número
+        se considera sospechoso: cuánto puede pesar un ajuste, cuánto puede variar una tienda
+        entre cortes, cuánta diferencia se tolera entre un subtotal impreso y la suma real.
+        Los valores que vienen de fábrica son razonables; ajústalos cuando veas que algo se
+        marca de más o de menos.
+      </p>
+    </section>
+
+    <section id="ciclo">
+      <p class="rotulo">Cada corte</p>
+      <h2>El ciclo de trabajo</h2>
+      <p>
+        Seis pasos, siempre en este orden. Con la práctica son unos diez minutos.
+      </p>
+
+      <ol class="pasos">
+        <li class="paso">
+          <span class="paso-num">01</span>
+          <div>
+            <h3>Crea el corte</h3>
+            <p>
+              <strong>Configuración → Cortes.</strong> El nombre es libre pero único; ponle el
+              mismo con el que llamas al archivo. El tipo decide con qué se compara: usa
+              <em>Semanal</em> para un acumulado de mitad de mes y <em>Cierre de mes</em> para
+              el mes terminado. La aplicación solo compara cortes del mismo tipo.
+            </p>
+            <p>
+              <strong>No dejes vacíos «Días del mes» y «Transcurridos».</strong> Son los que
+              permiten proyectar el cierre, calcular el ritmo diario que necesitas y comparar
+              contra el corte anterior por venta por día en vez de por acumulado. Sin ellos la
+              aplicación no inventa una base: se salta esas comparaciones.
+            </p>
+          </div>
+        </li>
+
+        <li class="paso">
+          <span class="paso-num">02</span>
+          <div>
+            <h3>Sube el documento</h3>
+            <p>
+              <strong>Cargar datos.</strong> Eliges el corte, dices si el documento trae el
+              tablero de ventas o los ajustes por tipología, y subes el archivo. Acepta PDF,
+              PNG, JPG y WEBP, hasta 4 MB. Si un documento trae las dos cosas, súbelo dos veces
+              cambiando el desplegable.
+            </p>
+          </div>
+        </li>
+
+        <li class="paso">
+          <span class="paso-num">03</span>
+          <div>
+            <h3>Revisa lo leído</h3>
+            <p>
+              Lo extraído aparece con cada cifra al lado de la tienda a la que se asignó.
+              Corriges lo que haga falta, asignas lo que no emparejó y confirmas.
+              <strong>Nada se guarda hasta que confirmas.</strong> El archivo original queda
+              guardado y puedes volver a abrirlo desde la lista de cargas recientes.
+            </p>
+          </div>
+        </li>
+
+        <li class="paso">
+          <span class="paso-num">04</span>
+          <div>
+            <h3>Revisa el corte</h3>
+            <p>
+              <strong>Alertas → Revisar corte.</strong> Busca datos faltantes, cumplimientos
+              imposibles que suelen ser Meta y Real invertidos, ajustes fuera de rango contra
+              el resto de la cadena, saltos incoherentes entre cortes y subtotales que no
+              cuadran con la suma de las tiendas.
+            </p>
+            <p>
+              Cada alerta se marca como <em>Revisada</em> o <em>Descartada</em>, con una nota.
+              Lo que cierras no vuelve a levantarse.
+            </p>
+          </div>
+        </li>
+
+        <li class="paso">
+          <span class="paso-num">05</span>
+          <div>
+            <h3>Pide el análisis</h3>
+            <p>
+              <strong>Análisis → Analizar corte.</strong> Las cifras no las calcula el modelo:
+              se le entregan ya derivadas y él aporta diagnóstico, estimación y
+              recomendaciones priorizadas por dinero. Cuesta una llamada por análisis, así que
+              conviene pedirlo cuando el corte ya está limpio.
+            </p>
+          </div>
+        </li>
+
+        <li class="paso">
+          <span class="paso-num">06</span>
+          <div>
+            <h3>Genera los documentos</h3>
+            <p>
+              <strong>Documentos.</strong> Informe ejecutivo de la zona y presentación por
+              tienda. Se ven en pantalla, se imprimen a PDF y se descargan en PowerPoint o
+              Word. Las alertas abiertas viajan dentro del informe como salvedades sobre la
+              data, para que nadie lea una cifra sin saber qué le falta.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="pantallas">
+      <p class="rotulo">Referencia</p>
+      <h2>Qué hay en cada pantalla</h2>
+
+      <dl class="pantallas">
+        <div class="pantalla">
+          <dt>Inicio</dt>
+          <dd>Gestión por excepción: lo que se salió de rango, no la lista completa. Evolución del año y meta contra real por tienda.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Tablero</dt>
+          <dd>El Tablero de Control de Ventas. Tu zona abierta tienda por tienda, el resto de la cadena como total. Proyección de cierre y consolidado de aportes.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Categorías</dt>
+          <dd>De dónde sale la venta y de dónde sale el margen. Ranking Pareto y matriz BCG, por zona o por tienda.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Ajustes</dt>
+          <dd>Dónde se pierde dinero y de qué forma. En porcentaje sobre ventas, que es lo que hace comparable una tienda grande con una pequeña.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Alertas</dt>
+          <dd>Las inconsistencias del corte, cada una con su explicación y sus dos cifras. Se revisan o se descartan.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Análisis</dt>
+          <dd>Lectura del corte con criterio de dirección de operaciones: qué pasó, cuánto vale corregirlo y qué hacer en tienda.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Planes de acción</dt>
+          <dd>Diagnóstico, metas cuantificadas y hitos a tres meses, con el dinero en juego declarado.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Documentos</dt>
+          <dd>Informe ejecutivo y presentación de tienda, para ver, imprimir o descargar.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Cargar datos</dt>
+          <dd>Lectura automática de documentos y captura manual como respaldo.</dd>
+        </div>
+        <div class="pantalla">
+          <dt>Configuración</dt>
+          <dd>Perfil, catálogo, cortes, umbrales, benchmarks, memoria operativa y la zona de datos.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="formato">
+      <p class="rotulo">Especificación</p>
+      <h2>El formato del tablero de ventas</h2>
+      <p>
+        No hay plantilla obligatoria: la aplicación lee el documento que ya produces. Pero
+        cuanto más se parezca a esto, más limpia sale la lectura y menos tiempo pasas
+        corrigiendo.
+      </p>
+
+      <div class="envoltorio">
+        <table>
+          <thead>
+            <tr><th>Columna</th><th>Tipo</th><th>Qué debe contener</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="campo">Tienda</td><td class="tipo">texto</td><td>Nombre de la sucursal. Una fila por tienda.</td></tr>
+            <tr><td class="campo">Ventas Meta</td><td class="tipo">número</td><td>Meta de venta del período, en dinero.</td></tr>
+            <tr><td class="campo">Ventas Real</td><td class="tipo">número</td><td>Venta ejecutada del período.</td></tr>
+            <tr><td class="campo">Unidades Meta</td><td class="tipo">número</td><td>Meta de unidades vendidas.</td></tr>
+            <tr><td class="campo">Unidades Real</td><td class="tipo">número</td><td>Unidades ejecutadas.</td></tr>
+            <tr><td class="campo">Transacciones Meta</td><td class="tipo">número</td><td>Meta de tickets.</td></tr>
+            <tr><td class="campo">Transacciones Real</td><td class="tipo">número</td><td>Tickets ejecutados.</td></tr>
+            <tr><td class="campo">%MB Meta</td><td class="tipo">número</td><td>Margen bruto objetivo, como número: 22,5 y no 0,225.</td></tr>
+            <tr><td class="campo">%MB Real</td><td class="tipo">número</td><td>Margen bruto ejecutado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="pie-tabla">
+        Si tu reporte solo trae el valor real de algún indicador, deja la meta fuera: la
+        aplicación la registra como vacía y sigue. Nunca la deduce.
+      </p>
+
+      <h3>Así debería verse</h3>
+
+      <div class="envoltorio ejemplo">
+        <table>
+          <thead>
+            <tr>
+              <th>Tienda</th>
+              <th class="cifra">Vtas Meta</th>
+              <th class="cifra">Vtas Real</th>
+              <th class="cifra">Und Meta</th>
+              <th class="cifra">Und Real</th>
+              <th class="cifra">Trx Meta</th>
+              <th class="cifra">Trx Real</th>
+              <th class="cifra">%MB Meta</th>
+              <th class="cifra">%MB Real</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Puerto Ordaz</td><td class="cifra">3.179.300</td><td class="cifra">3.413.000</td><td class="cifra">300.700</td><td class="cifra">322.950</td><td class="cifra">96.600</td><td class="cifra">103.750</td><td class="cifra">23,6</td><td class="cifra">23,4</td></tr>
+            <tr><td>Plaza Mayor</td><td class="cifra">1.516.100</td><td class="cifra">1.374.400</td><td class="cifra">109.600</td><td class="cifra">99.379</td><td class="cifra">43.800</td><td class="cifra">39.752</td><td class="cifra">20,0</td><td class="cifra">19,1</td></tr>
+            <tr><td>Maturín Tipuro</td><td class="cifra">2.480.000</td><td class="cifra">2.774.500</td><td class="cifra">216.800</td><td class="cifra">242.605</td><td class="cifra">80.700</td><td class="cifra">90.347</td><td class="cifra">17,8</td><td class="cifra">16,9</td></tr>
+            <tr class="subtotal"><td>Total Zona Oriente</td><td class="cifra">7.175.400</td><td class="cifra">7.561.900</td><td class="cifra">627.100</td><td class="cifra">664.934</td><td class="cifra">221.100</td><td class="cifra">233.849</td><td class="cifra">20,5</td><td class="cifra">19,8</td></tr>
+            <tr class="total"><td>Total Cadena</td><td class="cifra">44.092.600</td><td class="cifra">43.974.600</td><td class="cifra">3.512.400</td><td class="cifra">3.504.828</td><td class="cifra">1.401.800</td><td class="cifra">1.399.575</td><td class="cifra">22,0</td><td class="cifra">20,4</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="pie-tabla">
+        Cifras de ejemplo. Los subtotales de zona y el total de cadena no son opcionales ni
+        estorban: la aplicación los compara contra la suma de las tiendas que leyó y levanta
+        una alerta si difieren. Es la verificación que hoy haces a mano.
+      </p>
+
+      <h3>Las cinco cosas que arruinan una lectura</h3>
+      <ul>
+        <li><strong>Celdas combinadas.</strong> Un encabezado que abarca dos columnas hace que las cifras se asignen a la columna equivocada.</li>
+        <li><strong>Subtotales sin etiquetar.</strong> Una fila de total que se llama igual que una tienda se carga como si fuera una tienda más y duplica la zona.</li>
+        <li><strong>Meta y real sin encabezado que los distinga.</strong> Si las dos columnas dicen «Ventas», no hay forma de saber cuál es cuál.</li>
+        <li><strong>La tabla partida entre dos páginas.</strong> Cabe todo en una o se sube cada página por separado.</li>
+        <li><strong>Fondos de color fuertes.</strong> Bajan el contraste y las cifras salen dudosas. Un fondo tenue está bien; uno saturado no.</li>
+      </ul>
+
+      <div class="aviso aviso-ojo">
+        <strong>Sobre el peso del archivo</strong>
+        <p>
+          El límite son 4 MB. Si tu PDF pesa más, exporta solo la página del tablero en vez del
+          documento completo. Si es una captura, guárdala en JPG en lugar de PNG: pesa mucho
+          menos con el mismo contenido.
+        </p>
+      </div>
+    </section>
+
+    <section id="ajustes">
+      <p class="rotulo">Especificación</p>
+      <h2>El formato del reporte de ajustes</h2>
+      <p>
+        Las cinco tipologías, siempre en columnas separadas y con el signo tal como sale de la
+        fuente.
+      </p>
+
+      <div class="envoltorio">
+        <table>
+          <thead>
+            <tr><th>Columna</th><th>Signo</th><th>Qué debe contener</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="campo">Sucursal</td><td class="tipo">—</td><td>Nombre de la tienda. Una fila por sucursal.</td></tr>
+            <tr><td class="campo">Merma</td><td class="tipo">negativo</td><td>Producto perdido, vencido o deteriorado.</td></tr>
+            <tr><td class="campo">Mercancía Dañada</td><td class="tipo">negativo</td><td>Producto roto o inservible.</td></tr>
+            <tr><td class="campo">Carga y Descarga</td><td class="tipo">negativo</td><td>Diferencias en recepción y despacho.</td></tr>
+            <tr><td class="campo">Inventario</td><td class="tipo">negativo</td><td>Diferencias de conteo contra sistema.</td></tr>
+            <tr><td class="campo">Ventas</td><td class="tipo">puede ser positivo</td><td>Ajustes de venta. Es la única tipología que suele salir a favor.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="pie-tabla">
+        Indica en el documento si las cifras son montos en dinero o porcentajes sobre ventas.
+        La aplicación lo detecta, pero si está escrito no hay lugar a dudas. Guarda siempre el
+        monto y calcula el porcentaje contra la venta real de esa tienda.
+      </p>
+
+      <div class="aviso aviso-alto">
+        <strong>Un ajuste sin venta no tiene porcentaje posible</strong>
+        <p>
+          Si una sucursal aparece con ajustes pero sin venta registrada, el peso sobre ventas
+          no se puede calcular. La aplicación lo marca en vez de dividir entre cero o asumir
+          un valor. Suele significar que esa sucursal consolida su venta en otra.
+        </p>
+      </div>
+    </section>
+
+    <section id="prompt">
+      <p class="rotulo">Para copiar</p>
+      <h2>Prompt para tu agente de IA</h2>
+      <p>
+        Si quien arma tus reportes es un asistente de IA, pásale esto junto con tus datos en
+        crudo. Está escrito para que produzca un documento que Operation Manager lee sin
+        fricción.
+      </p>
+
+      <div class="prompt">
+        <div class="prompt-barra">
+          <span>Prompt · tablero y ajustes</span>
+          <button class="copiar" type="button" id="btn-copiar">Copiar</button>
+        </div>
+        <pre id="texto-prompt">Necesito que armes dos documentos a partir de los datos que te paso. Van a ser leídos automáticamente por una aplicación de control de operaciones, así que el formato importa tanto como las cifras.
+
+REGLAS PARA LOS DOS DOCUMENTOS
+
+- Una tabla por documento, sin celdas combinadas en ningún lugar, ni siquiera en los encabezados.
+- Una fila por sucursal. El nombre de la sucursal va en la primera columna, escrito siempre igual en todos los documentos.
+- Los subtotales por zona y el total de la cadena van en filas aparte, al final, y etiquetados de forma inequívoca: "Total Zona Oriente", "Total Cadena". Nunca los mezcles entre las filas de sucursal.
+- Encabezados en una sola fila, con el nombre completo de cada columna. Si hay meta y real, cada una lleva su propia columna con su propio encabezado; no uses un encabezado que abarque dos columnas.
+- Formato numérico latino: punto para miles y coma para decimales. Sin símbolo de moneda dentro de las celdas.
+- Los porcentajes como número con su signo de porcentaje: escribe 22,5 % y no 0,225.
+- No inventes, estimes ni completes ningún dato. Si un valor no está en la fuente, deja la celda vacía y anótalo al pie del documento.
+- Toda la tabla en una sola página. Si no cabe, reduce el tamaño de letra antes que partirla.
+- Fondo blanco o gris muy tenue. Nada de colores saturados detrás de las cifras: bajan el contraste y se leen mal.
+- En el título del documento, el período exacto que cubre. Por ejemplo: "Acumulado al 23/08/2026" o "Cierre Agosto 2026".
+
+DOCUMENTO 1 — TABLERO DE CONTROL DE VENTAS
+
+Columnas, en este orden:
+
+Tienda | Ventas Meta | Ventas Real | Unidades Meta | Unidades Real | Transacciones Meta | Transacciones Real | %MB Meta | %MB Real
+
+Si de algún indicador solo tengo el valor real, incluye la columna real y omite la de meta por completo. No la rellenes con ceros ni con guiones.
+
+DOCUMENTO 2 — AJUSTES POR TIPOLOGÍA
+
+Columnas, en este orden:
+
+Sucursal | Merma | Mercancía Dañada | Carga y Descarga | Inventario | Ventas
+
+Los ajustes en contra van en negativo, con el signo visible. La tipología "Ventas" puede salir positiva: respétalo tal como venga en la fuente, no la fuerces a negativo.
+
+Indica en el encabezado del documento si las cifras son montos en dinero o porcentajes sobre ventas.
+
+ENTREGA
+
+Los dos documentos en PDF, cada uno en su archivo, de menos de 4 MB. Si un PDF se pasa de peso, entrégalo como imagen JPG de la tabla a resolución legible.
+
+Antes de entregar, verifica que la suma de las filas de sucursal cuadra con cada subtotal de zona, y que la suma de las zonas cuadra con el total de cadena. Si algo no cuadra, no lo ajustes por tu cuenta: entrégalo como está y dime exactamente dónde está la diferencia y de cuánto es.</pre>
+      </div>
+      <p class="pie-tabla">
+        El último párrafo es el que más te va a servir. Le pide a tu asistente que cuadre pero
+        que no corrija: si algo no suma, que te lo diga en vez de arreglarlo. Es la misma regla
+        con la que trabaja la aplicación.
+      </p>
+    </section>
+
+    <section id="problemas">
+      <p class="rotulo">Solución de problemas</p>
+      <h2>Si algo no sale como esperas</h2>
+
+      <h3>Una tienda quedó sin asignar al revisar</h3>
+      <p>
+        El nombre del documento no coincidió con ninguno del catálogo. Asígnala a mano en esa
+        misma pantalla y después agrega ese nombre como alias en
+        <strong>Configuración → Zonas y tiendas</strong>, para que la próxima vez entre sola.
+      </p>
+
+      <h3>No aparece la proyección de cierre</h3>
+      <p>
+        Al corte le faltan «Días del mes» o «Transcurridos». Complétalos en
+        <strong>Configuración → Cortes</strong> y vuelve a entrar. La aplicación no proyecta
+        sobre una base que no tiene.
+      </p>
+
+      <h3>La comparación con el corte anterior no aparece</h3>
+      <p>
+        Solo se comparan cortes del mismo tipo. Un acumulado de mitad de mes no se compara
+        contra un mes cerrado, porque mediría días y no desempeño. Revisa que el tipo esté bien
+        puesto en los dos cortes.
+      </p>
+
+      <h3>Salen muchas alertas del mismo tipo todos los meses</h3>
+      <p>
+        El umbral está demasiado apretado para tu operación. Ajústalo en
+        <strong>Configuración → Umbrales</strong>. Una alerta que se repite sin cambiar no
+        detecta nada: enseña a ignorar las alertas.
+      </p>
+
+      <h3>El archivo no sube</h3>
+      <p>
+        El límite son 4 MB y solo acepta PDF, PNG, JPG y WEBP. La aplicación te avisa del peso
+        real del archivo antes de enviarlo.
+      </p>
+
+      <h3>La lectura automática está desactivada</h3>
+      <p>
+        Falta la clave de Anthropic en las variables de entorno. El resto de la aplicación
+        funciona igual: puedes teclear las cifras en la pestaña de captura manual mientras
+        tanto.
+      </p>
+    </section>
+
+    <footer class="cierre">
+      <p>
+        Operation Manager · Manual de uso. Las cifras que aparecen en los ejemplos son
+        ilustrativas.
+      </p>
+      <p>
+        Si algo de lo que ves en pantalla no coincide con lo que dice este manual, gana lo que
+        dice la pantalla: la aplicación se sigue afinando con el uso.
+      </p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  (function () {
+    var boton = document.getElementById("btn-copiar");
+    var texto = document.getElementById("texto-prompt");
+    if (!boton || !texto) return;
+
+    boton.addEventListener("click", function () {
+      var contenido = texto.textContent || "";
+      var listo = function () {
+        boton.textContent = "Copiado";
+        setTimeout(function () { boton.textContent = "Copiar"; }, 1800);
+      };
+      var falla = function () {
+        // Si el portapapeles está bloqueado, se selecciona el texto para copiarlo a mano.
+        var rango = document.createRange();
+        rango.selectNodeContents(texto);
+        var seleccion = window.getSelection();
+        seleccion.removeAllRanges();
+        seleccion.addRange(rango);
+        boton.textContent = "Copia con Ctrl+C";
+        setTimeout(function () { boton.textContent = "Copiar"; }, 2600);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(contenido).then(listo).catch(falla);
+      } else {
+        falla();
+      }
+    });
+  })();
+</script>
