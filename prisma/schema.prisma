@@ -75,12 +75,13 @@ model Tienda {
   metrosCuadrados Float?
   fechaApertura   DateTime?
 
-  ventas     RegistroVentas[]
-  ajustes    RegistroAjuste[]
-  categorias RegistroCategoria[]
-  alertas    Alerta[]
-  planes     PlanAccion[]
-  notas      NotaMemoria[]
+  ventas       RegistroVentas[]
+  ajustes      RegistroAjuste[]
+  categorias   RegistroCategoria[]
+  alertas      Alerta[]
+  planes       PlanAccion[]
+  notas        NotaMemoria[]
+  inspecciones Inspeccion[]
 
   @@index([zonaId])
 }
@@ -105,6 +106,7 @@ model Corte {
   planes        PlanAccion[]
   notas         NotaMemoria[]
   analisis      Analisis[]
+  inspecciones  Inspeccion[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -333,9 +335,9 @@ model NotaMemoria {
 }
 
 model Extraccion {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   corteId String?
-  corte   Corte? @relation(fields: [corteId], references: [id], onDelete: SetNull)
+  corte   Corte?  @relation(fields: [corteId], references: [id], onDelete: SetNull)
 
   archivoNombre String
   archivoTipo   String
@@ -343,12 +345,95 @@ model Extraccion {
   // El original se guarda en la base y no en disco: en un despliegue serverless el sistema de
   // archivos es de solo lectura y efímero, y el rastro de auditoría se perdería en cada deploy.
   archivoContenido Bytes?
-  destino        String   @default("VENTAS") // VENTAS | AJUSTES
-  estado         String   @default("PENDIENTE") // PENDIENTE | EXTRAIDO | CONFIRMADO | ERROR
-  modelo         String?
-  respuestaCruda String? // JSON serializado
-  error          String?
-  creadaEn       DateTime @default(now())
+  destino          String   @default("VENTAS") // VENTAS | AJUSTES
+  estado           String   @default("PENDIENTE") // PENDIENTE | EXTRAIDO | CONFIRMADO | ERROR
+  modelo           String?
+  respuestaCruda   String? // JSON serializado
+  error            String?
+  creadaEn         DateTime @default(now())
 
   @@index([corteId])
+}
+
+// ─── Checklists de operación ────────────────────────────────────────────────
+// Lo que se revisa en tienda y qué se hizo con lo que salió mal. Una plantilla se aplica
+// muchas veces; cada aplicación es una Inspección y cada punto revisado deja su resultado,
+// su observación y su corrección con responsable y fecha. Una corrección sin dueño ni plazo
+// no se cierra nunca, así que ambos campos viven en el modelo y no en un texto libre.
+
+model Checklist {
+  id          String  @id @default(cuid())
+  nombre      String  @unique
+  descripcion String?
+  // Cada cuánto se espera aplicar: DIARIA | SEMANAL | MENSUAL | EVENTUAL
+  frecuencia  String  @default("SEMANAL")
+  activa      Boolean @default(true)
+  orden       Int     @default(0)
+
+  puntos       PuntoChecklist[]
+  inspecciones Inspeccion[]
+}
+
+model PuntoChecklist {
+  id          String    @id @default(cuid())
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  actividad String
+  // Agrupa los puntos dentro de la hoja: Salón, Perecederos, Almacén, Caja, Personal…
+  area      String?
+  // Un punto crítico que sale NO OK no se puede cerrar la inspección sin corrección.
+  critico   Boolean @default(false)
+  orden     Int     @default(0)
+
+  resultados ResultadoPunto[]
+
+  @@index([checklistId])
+}
+
+model Inspeccion {
+  id          String    @id @default(cuid())
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  tiendaId    String
+  tienda      Tienda    @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  corteId     String?
+  corte       Corte?    @relation(fields: [corteId], references: [id], onDelete: SetNull)
+
+  fecha       DateTime @default(now())
+  responsable String?
+  // ABIERTA mientras se llena; CERRADA cuando se dio por revisada.
+  estado      String   @default("ABIERTA")
+  nota        String?
+  creadaEn    DateTime @default(now())
+
+  resultados ResultadoPunto[]
+
+  @@index([tiendaId, fecha])
+  @@index([checklistId])
+}
+
+model ResultadoPunto {
+  id           String         @id @default(cuid())
+  inspeccionId String
+  inspeccion   Inspeccion     @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  puntoId      String
+  punto        PuntoChecklist @relation(fields: [puntoId], references: [id], onDelete: Cascade)
+
+  // PENDIENTE mientras no se ha revisado; luego OK | NO_OK | NO_APLICA.
+  cumple      String    @default("PENDIENTE")
+  // Qué se encontró mal. Solo tiene sentido cuando cumple = NO_OK.
+  observacion String?
+  // El plan de acción: qué se va a hacer, quién y para cuándo.
+  correccion  String?
+  responsable String?
+  fechaLimite DateTime?
+  // PENDIENTE | EN_CURSO | RESUELTO | VERIFICADO
+  estado      String    @default("PENDIENTE")
+
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([inspeccionId, puntoId])
+  @@index([puntoId])
+  @@index([estado])
 }

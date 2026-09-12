@@ -227,3 +227,66 @@ function revalidarTodo() {
     revalidatePath(ruta);
   }
 }
+
+// ─── Checklists ─────────────────────────────────────────────────────────────
+
+export async function guardarChecklist(formData: FormData) {
+  const id = texto(formData, "id");
+  const datos = {
+    nombre: String(formData.get("nombre") ?? "").trim(),
+    descripcion: texto(formData, "descripcion"),
+    frecuencia: String(formData.get("frecuencia") ?? "SEMANAL"),
+    activa: formData.get("activa") === "on",
+  };
+  if (!datos.nombre) return;
+
+  if (id) {
+    await prisma.checklist.update({ where: { id }, data: datos });
+  } else {
+    const ultimo = await prisma.checklist.findFirst({ orderBy: { orden: "desc" } });
+    await prisma.checklist.create({ data: { ...datos, orden: (ultimo?.orden ?? 0) + 1 } });
+  }
+  revalidatePath("/configuracion");
+  revalidatePath("/inspecciones");
+}
+
+export async function eliminarChecklist(formData: FormData) {
+  const id = texto(formData, "id");
+  if (!id) return;
+  await prisma.checklist.delete({ where: { id } });
+  revalidatePath("/configuracion");
+  revalidatePath("/inspecciones");
+}
+
+export async function guardarPunto(formData: FormData) {
+  const id = texto(formData, "id");
+  const checklistId = texto(formData, "checklistId");
+  const actividad = String(formData.get("actividad") ?? "").trim();
+  if (!actividad) return;
+
+  const datos = {
+    actividad,
+    area: texto(formData, "area"),
+    critico: formData.get("critico") === "on",
+  };
+
+  if (id) {
+    await prisma.puntoChecklist.update({ where: { id }, data: datos });
+  } else if (checklistId) {
+    const ultimo = await prisma.puntoChecklist.findFirst({
+      where: { checklistId },
+      orderBy: { orden: "desc" },
+    });
+    await prisma.puntoChecklist.create({
+      data: { ...datos, checklistId, orden: (ultimo?.orden ?? 0) + 1 },
+    });
+  }
+  revalidatePath("/configuracion");
+}
+
+export async function eliminarPunto(formData: FormData) {
+  const id = texto(formData, "id");
+  if (!id) return;
+  await prisma.puntoChecklist.delete({ where: { id } });
+  revalidatePath("/configuracion");
+}

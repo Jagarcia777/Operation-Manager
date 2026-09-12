@@ -1,11 +1,24 @@
 import { Monograma } from "@/components/Monograma";
 import { Pestanas } from "@/components/Pestanas";
+import { EstadoVacio } from "@/components/EstadoVacio";
 import { prisma } from "@/lib/db";
-import { ESTADOS_CORTE, ETIQUETA_ESTADO_CORTE, ETIQUETA_TIPO_CORTE, TIPOS_CORTE } from "@/lib/dominio";
+import {
+  ESTADOS_CORTE,
+  ETIQUETA_ESTADO_CORTE,
+  ETIQUETA_FRECUENCIA,
+  ETIQUETA_TIPO_CORTE,
+  FRECUENCIAS_CHECKLIST,
+  TIPOS_CORTE,
+  type FrecuenciaChecklist,
+} from "@/lib/dominio";
 import { fechaCorta } from "@/lib/formato";
 import {
   agregarNota,
   cargarDatosDemo,
+  eliminarChecklist,
+  eliminarPunto,
+  guardarChecklist,
+  guardarPunto,
   vaciarAplicacion,
   archivarNota,
   cambiarEstadoCorte,
@@ -24,6 +37,7 @@ const SECCIONES = [
   { clave: "cortes", etiqueta: "Cortes" },
   { clave: "umbrales", etiqueta: "Umbrales de alerta" },
   { clave: "benchmarks", etiqueta: "Benchmarks" },
+  { clave: "checklists", etiqueta: "Checklists" },
   { clave: "memoria", etiqueta: "Memoria operativa" },
   { clave: "datos", etiqueta: "Datos" },
 ];
@@ -58,6 +72,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps<"/co
       {seccion === "cortes" && <SeccionCortes />}
       {seccion === "umbrales" && <SeccionUmbrales />}
       {seccion === "benchmarks" && <SeccionBenchmarks />}
+      {seccion === "checklists" && <SeccionChecklists />}
       {seccion === "memoria" && <SeccionMemoria />}
       {seccion === "datos" && (
         <SeccionDatos
@@ -65,7 +80,9 @@ export default async function ConfiguracionPage({ searchParams }: PageProps<"/co
           hecho={typeof parametros.hecho === "string" ? parametros.hecho : null}
         />
       )}
-      {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria", "datos"].includes(seccion) && (
+      {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria", "datos", "checklists"].includes(
+        seccion,
+      ) && (
         <SeccionPerfil />
       )}
     </div>
@@ -640,6 +657,137 @@ async function SeccionDatos({ error, hecho }: { error: string | null; hecho: str
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+async function SeccionChecklists() {
+  const checklists = await prisma.checklist.findMany({
+    orderBy: { orden: "asc" },
+    include: { puntos: { orderBy: { orden: "asc" } }, _count: { select: { inspecciones: true } } },
+  });
+
+  return (
+    <div className="max-w-4xl space-y-4">
+      <form action={guardarChecklist} className="tarjeta flex flex-wrap items-end gap-3 p-4">
+        <label className="text-sm">
+          <span className="text-texto-2">Nuevo checklist</span>
+          <input name="nombre" placeholder="Apertura de tienda" className="campo mt-1.5 w-56" required />
+        </label>
+        <label className="text-sm">
+          <span className="text-texto-2">Frecuencia</span>
+          <select name="frecuencia" className="campo mt-1.5 w-36">
+            {FRECUENCIAS_CHECKLIST.map((frecuencia) => (
+              <option key={frecuencia} value={frecuencia}>
+                {ETIQUETA_FRECUENCIA[frecuencia]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input type="checkbox" name="activa" defaultChecked className="size-4" />
+          <span className="text-texto-2">Activo</span>
+        </label>
+        <button type="submit" className="boton boton-primario">
+          Crear
+        </button>
+      </form>
+
+      {checklists.length === 0 ? (
+        <EstadoVacio mensaje="Todavía no hay checklists. Crea el primero arriba." />
+      ) : (
+        checklists.map((checklist) => (
+          <details key={checklist.id} className="tarjeta p-4" open={checklists.length === 1}>
+            <summary className="cursor-pointer text-sm font-semibold">
+              {checklist.nombre}
+              <span className="ml-2 font-normal text-texto-3">
+                {checklist.puntos.length} puntos ·{" "}
+                {ETIQUETA_FRECUENCIA[checklist.frecuencia as FrecuenciaChecklist] ??
+                  checklist.frecuencia}
+                {checklist._count.inspecciones > 0 &&
+                  ` · ${checklist._count.inspecciones} inspecciones`}
+                {!checklist.activa && " · inactivo"}
+              </span>
+            </summary>
+
+            <div className="mt-4 space-y-2">
+              {checklist.puntos.map((punto) => (
+                <form
+                  key={punto.id}
+                  action={guardarPunto}
+                  className="flex flex-wrap items-end gap-2 border-b border-borde-suave pb-2 last:border-0"
+                >
+                  <input type="hidden" name="id" value={punto.id} />
+                  <input
+                    name="actividad"
+                    defaultValue={punto.actividad}
+                    className="campo w-full sm:w-96"
+                  />
+                  <input
+                    name="area"
+                    defaultValue={punto.area ?? ""}
+                    placeholder="Área"
+                    className="campo w-36"
+                  />
+                  <label className="flex items-center gap-1.5 pb-2 text-xs text-texto-2">
+                    <input
+                      type="checkbox"
+                      name="critico"
+                      defaultChecked={punto.critico}
+                      className="size-3.5"
+                    />
+                    Crítico
+                  </label>
+                  <button type="submit" className="boton boton-secundario">
+                    Guardar
+                  </button>
+                  <button
+                    type="submit"
+                    formAction={eliminarPunto}
+                    className="boton boton-secundario text-alerta"
+                  >
+                    Quitar
+                  </button>
+                </form>
+              ))}
+
+              <form action={guardarPunto} className="flex flex-wrap items-end gap-2 pt-2">
+                <input type="hidden" name="checklistId" value={checklist.id} />
+                <input
+                  name="actividad"
+                  placeholder="Nueva actividad a revisar"
+                  className="campo w-full sm:w-96"
+                  required
+                />
+                <input name="area" placeholder="Área" className="campo w-36" />
+                <label className="flex items-center gap-1.5 pb-2 text-xs text-texto-2">
+                  <input type="checkbox" name="critico" className="size-3.5" />
+                  Crítico
+                </label>
+                <button type="submit" className="boton boton-primario">
+                  Agregar
+                </button>
+              </form>
+            </div>
+
+            <form action={eliminarChecklist} className="mt-4 border-t border-borde-suave pt-3">
+              <input type="hidden" name="id" value={checklist.id} />
+              <button type="submit" className="boton boton-secundario text-alerta">
+                Eliminar checklist
+              </button>
+              <span className="ml-2 text-xs text-texto-3">
+                Se llevan también sus inspecciones.
+              </span>
+            </form>
+          </details>
+        ))
+      )}
+
+      <p className="text-xs text-texto-3">
+        Un punto <strong>crítico</strong> no deja cerrar la inspección si sale No OK sin
+        corrección escrita. Reserva esa marca para lo que de verdad no puede quedarse sin dueño:
+        cadena de frío, precios, seguridad.
+      </p>
     </div>
   );
 }

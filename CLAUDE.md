@@ -46,6 +46,7 @@ src/lib/documentos/       generación de PPTX/DOCX
 src/components/           componentes compartidos de UI
 src/components/graficos/  gráficos en SVG propio (sin librerías: no se cargan terceros)
 src/lib/demo.ts           generador de la cadena de demostración (un año de historia)
+src/app/(panel)/inspecciones/  checklists de operación y seguimiento de correcciones
 ```
 
 ## Convenciones
@@ -62,6 +63,10 @@ src/lib/demo.ts           generador de la cadena de demostración (un año de hi
   esas usan `RegistroZona` y su total sí se captura, porque no hay detalle del cual derivarlo.
 - **Los ajustes por tipología van con el signo de la fuente**: negativos cuando son en contra.
   La tipología "Ventas" puede salir a favor. Al comparar magnitudes, usar valor absoluto.
+- **Una no conformidad sin responsable ni fecha no se cierra nunca.** En los checklists, lo que
+  sale No OK exige observación y corrección; un punto marcado `critico` impide cerrar la
+  inspección si no la tiene. Al guardar, lo que vuelve a OK pierde su observación y su
+  corrección: si no, la hoja seguiría contando hallazgos que ya no existen.
 - **La app nunca corrige datos en silencio.** Toda inconsistencia se registra como `Alerta`
   con su explicación y queda para que una persona confirme o descarte.
 - Todo dato extraído por IA entra como *propuesta*: requiere revisión humana antes de guardarse.

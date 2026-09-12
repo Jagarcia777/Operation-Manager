@@ -357,6 +357,7 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   await sembrarNotas(prisma, zonaPropia.id, tiendas);
   await sembrarAlertas(prisma, corteActual.id, corteMedio.id, tiendas);
   await sembrarAnalisis(prisma, corteActual, zonaPropia.id);
+  await sembrarChecklists(prisma, tiendas, corteActual.id);
 
   return {
     cortes: todos.length,
@@ -875,3 +876,214 @@ const ETIQUETA_TIPOLOGIA_DEMO: Record<string, string> = {
   INVENTARIO: "Inventario",
   VENTAS: "Ventas",
 };
+
+
+/**
+ * Checklists de operación con sus inspecciones. Son las hojas que se recorren en tienda, y lo
+ * que hace útil el módulo no es marcar OK sino lo que pasa con lo que sale No OK: la
+ * observación, la corrección con dueño y fecha, y su estatus hasta cerrarse. Por eso el demo
+ * trae hallazgos en los tres estados —verificado, en curso y uno vencido—: una hoja donde todo
+ * está en verde no enseña para qué sirve la herramienta.
+ */
+const CHECKLISTS_DEMO = [
+  {
+    nombre: "Apertura de tienda",
+    descripcion: "Lo que tiene que estar listo antes de abrir las puertas.",
+    frecuencia: "DIARIA",
+    puntos: [
+      { area: "Salón", actividad: "Piso limpio, seco y sin obstáculos en pasillos principales" },
+      { area: "Salón", actividad: "Iluminación completa en salón y vitrinas" },
+      { area: "Salón", actividad: "Carritos y cestas disponibles y en buen estado" },
+      { area: "Perecederos", actividad: "Cámaras de frío dentro de rango de temperatura", critico: true },
+      { area: "Perecederos", actividad: "Vitrinas cargadas y producto del día rotulado" },
+      { area: "Perecederos", actividad: "Registro de temperatura del turno firmado", critico: true },
+      { area: "Caja", actividad: "Fondo de caja cuadrado y entregado por turno", critico: true },
+      { area: "Caja", actividad: "Impresoras con papel y lectores operativos" },
+      { area: "Personal", actividad: "Dotación completa según horario del día" },
+      { area: "Personal", actividad: "Uniforme e identificación visible" },
+      { area: "Almacén", actividad: "Mercancía recibida del día ubicada y no en pasillo" },
+    ],
+  },
+  {
+    nombre: "Cierre de tienda",
+    descripcion: "Lo que no puede quedar pendiente al bajar la santamaría.",
+    frecuencia: "DIARIA",
+    puntos: [
+      { area: "Caja", actividad: "Arqueo de cajas cuadrado y diferencias documentadas", critico: true },
+      { area: "Caja", actividad: "Depósito preparado y resguardado" },
+      { area: "Perecederos", actividad: "Producto de vida corta retirado y cargado como merma", critico: true },
+      { area: "Perecederos", actividad: "Cámaras y vitrinas cerradas y en temperatura", critico: true },
+      { area: "Salón", actividad: "Reposición dejada lista para la apertura" },
+      { area: "Salón", actividad: "Limpieza general de salón y baños" },
+      { area: "Seguridad", actividad: "Alarmas activadas y accesos cerrados", critico: true },
+      { area: "Seguridad", actividad: "Cámaras de seguridad grabando" },
+    ],
+  },
+  {
+    nombre: "Auditoría de perecederos",
+    descripcion: "Donde se pierde el margen: frío, rotación y registro de merma.",
+    frecuencia: "SEMANAL",
+    puntos: [
+      { area: "Cadena de frío", actividad: "Temperaturas registradas en los tres turnos", critico: true },
+      { area: "Cadena de frío", actividad: "Termómetros calibrados y con etiqueta vigente" },
+      { area: "Rotación", actividad: "PEPS aplicado: lo más viejo al frente" },
+      { area: "Rotación", actividad: "Sin producto vencido en exhibición", critico: true },
+      { area: "Rotación", actividad: "Producto próximo a vencer identificado y con acción" },
+      { area: "Registro", actividad: "Merma del día cargada en sistema el mismo día" },
+      { area: "Registro", actividad: "Merma soportada con acta firmada" },
+      { area: "Higiene", actividad: "Superficies, cuchillos y sierras sanitizados" },
+      { area: "Higiene", actividad: "Empaque y rotulado con fecha y peso correctos" },
+    ],
+  },
+  {
+    nombre: "Control de precios y exhibición",
+    descripcion: "Que lo que dice la góndola sea lo que cobra la caja.",
+    frecuencia: "SEMANAL",
+    puntos: [
+      { area: "Precios", actividad: "Precio de góndola coincide con el del sistema", critico: true },
+      { area: "Precios", actividad: "Promociones vigentes señalizadas y con fecha" },
+      { area: "Precios", actividad: "Sin etiquetas de promoción vencida en salón", critico: true },
+      { area: "Exhibición", actividad: "Frente de góndola completo en categorías vitales" },
+      { area: "Exhibición", actividad: "Planograma respetado en pasillos de alto tránsito" },
+      { area: "Exhibición", actividad: "Puntas de góndola con la promoción del período" },
+    ],
+  },
+] as const;
+
+/** Hallazgos plausibles, con su corrección y el estado en que estaría hoy. */
+const HALLAZGOS_DEMO = [
+  {
+    actividad: "Cámaras de frío dentro de rango de temperatura",
+    observacion:
+      "Cámara de lácteos en 8 °C, dos grados por encima del rango. El registro del turno de la noche está en blanco.",
+    correccion:
+      "Técnico revisa el condensador el mismo día y se retoma el registro por turno con firma del responsable de perecederos.",
+    responsable: "Jefe de perecederos",
+    estado: "VERIFICADO",
+    diasLimite: -6,
+  },
+  {
+    actividad: "Precio de góndola coincide con el del sistema",
+    observacion:
+      "Once referencias de víveres con precio de góndola por debajo del sistema. La caja cobra más de lo exhibido.",
+    correccion:
+      "Barrido completo de etiquetas en víveres y cambio del procedimiento: el cambio de precio se imprime y se coloca el mismo día en que se carga.",
+    responsable: "Encargada de salón",
+    estado: "EN_CURSO",
+    diasLimite: 3,
+  },
+  {
+    actividad: "Merma del día cargada en sistema el mismo día",
+    observacion:
+      "Merma de carnicería de tres días acumulada sin cargar. Explica parte del salto de inventario del corte.",
+    correccion:
+      "Carga diaria obligatoria antes del cierre y cuadre semanal contra el acta física.",
+    responsable: "Gerente de tienda",
+    estado: "EN_CURSO",
+    diasLimite: -2,
+  },
+  {
+    actividad: "Sin producto vencido en exhibición",
+    observacion: "Dos referencias de charcutería vencidas el día anterior, aún en vitrina.",
+    correccion: "Retiro inmediato y revisión de fechas dos veces al día en perecederos.",
+    responsable: "Jefe de perecederos",
+    estado: "RESUELTO",
+    diasLimite: -4,
+  },
+  {
+    actividad: "Mercancía recibida del día ubicada y no en pasillo",
+    observacion: "Pallets de bebidas en pasillo de tránsito del almacén desde la recepción de ayer.",
+    correccion: "Ubicación dentro de las dos horas siguientes a la recepción.",
+    responsable: "Jefe de almacén",
+    estado: "PENDIENTE",
+    diasLimite: 5,
+  },
+  {
+    actividad: "Frente de góndola completo en categorías vitales",
+    observacion: "Huecos en víveres y lácteos a media mañana, con producto disponible en almacén.",
+    correccion: "Segunda ronda de reposición a las 11:00 los días de mayor tráfico.",
+    responsable: "Encargada de salón",
+    estado: "PENDIENTE",
+    diasLimite: 7,
+  },
+] as const;
+
+async function sembrarChecklists(
+  prisma: PrismaClient,
+  tiendas: { perfil: (typeof TIENDAS)[number]; fila: { id: string } }[],
+  corteId: string,
+) {
+  type Plantilla = { id: string; puntos: { id: string; actividad: string }[] };
+  const plantillas: Plantilla[] = [];
+  for (const [indice, definicion] of CHECKLISTS_DEMO.entries()) {
+    const checklist = await prisma.checklist.create({
+      data: {
+        nombre: definicion.nombre,
+        descripcion: definicion.descripcion,
+        frecuencia: definicion.frecuencia,
+        orden: indice + 1,
+        puntos: {
+          create: definicion.puntos.map((punto, orden) => ({
+            actividad: punto.actividad,
+            area: punto.area,
+            critico: "critico" in punto ? punto.critico : false,
+            orden: orden + 1,
+          })),
+        },
+      },
+      include: { puntos: true },
+    });
+    plantillas.push(checklist);
+  }
+
+  const hoy = new Date();
+  const porActividad = new Map<string, (typeof HALLAZGOS_DEMO)[number]>(
+    HALLAZGOS_DEMO.map((hallazgo) => [hallazgo.actividad as string, hallazgo]),
+  );
+
+  // Una ronda por tienda, alternando plantillas, en las tres semanas anteriores.
+  const rondas = tiendas.flatMap((tienda, i) => [
+    { tienda, plantilla: plantillas[i % plantillas.length], diasAtras: 2 + i * 2, cerrada: i > 1 },
+    { tienda, plantilla: plantillas[(i + 2) % plantillas.length], diasAtras: 11 + i, cerrada: true },
+  ]);
+
+  for (const [indice, ronda] of rondas.entries()) {
+    const fecha = new Date(hoy);
+    fecha.setDate(fecha.getDate() - ronda.diasAtras);
+
+    const resultados = ronda.plantilla.puntos.map((punto, orden) => {
+      const hallazgo = porActividad.get(punto.actividad);
+      // Los hallazgos caen en la mitad de las rondas: una tienda con medio checklist en rojo
+      // no es creíble, y una con todo en verde no enseña para qué sirve el módulo.
+      const falla = Boolean(hallazgo) && indice % 2 === 0;
+
+      if (!falla || !hallazgo) {
+        return { puntoId: punto.id, cumple: ruido(indice * 31 + orden) > 0.96 ? "NO_APLICA" : "OK" };
+      }
+
+      const limite = new Date(fecha);
+      limite.setDate(limite.getDate() + hallazgo.diasLimite + 7);
+      return {
+        puntoId: punto.id,
+        cumple: "NO_OK",
+        observacion: hallazgo.observacion,
+        correccion: hallazgo.correccion,
+        responsable: hallazgo.responsable,
+        fechaLimite: limite,
+        estado: hallazgo.estado,
+      };
+    });
+
+    await prisma.inspeccion.create({
+      data: {
+        checklistId: ronda.plantilla.id,
+        tiendaId: ronda.tienda.fila.id,
+        corteId,
+        fecha,
+        responsable: "José García",
+        estado: ronda.cerrada ? "CERRADA" : "ABIERTA",
+        resultados: { create: resultados },
+      },
+    });
+  }
+}

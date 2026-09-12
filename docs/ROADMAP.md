@@ -94,6 +94,13 @@ si algo queda a medias.
 - [x] Análisis precargado en el demo, derivado de sus propias cifras
 - [x] Manual de usuario con la especificación del Dashboard Ejecutivo y prompt para agentes
 
+## Fase 11 — Checklists de operación
+
+- [x] Plantillas de checklist con puntos, área y marca de punto crítico
+- [x] Inspección por tienda: actividad, validación, observación, corrección y estatus
+- [x] Seguimiento de correcciones abiertas con responsable, fecha límite y vencidas
+- [x] Cuatro checklists de supermercado cargados en la demostración
+
 ## Pendiente del lado del usuario
 
 No son tareas de código: la aplicación ya las admite desde Configuración.

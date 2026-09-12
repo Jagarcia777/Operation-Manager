@@ -122,3 +122,40 @@ export type EstadoExtraccion = (typeof ESTADOS_EXTRACCION)[number];
 
 export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES"] as const;
 export type DestinoExtraccion = (typeof DESTINOS_EXTRACCION)[number];
+
+// ─── Checklists de operación ────────────────────────────────────────────────
+
+export const FRECUENCIAS_CHECKLIST = ["DIARIA", "SEMANAL", "MENSUAL", "EVENTUAL"] as const;
+export type FrecuenciaChecklist = (typeof FRECUENCIAS_CHECKLIST)[number];
+export const ETIQUETA_FRECUENCIA: Record<FrecuenciaChecklist, string> = {
+  DIARIA: "Diaria",
+  SEMANAL: "Semanal",
+  MENSUAL: "Mensual",
+  EVENTUAL: "Eventual",
+};
+
+/** Resultado de revisar un punto. PENDIENTE es "todavía no lo miré", no "está mal". */
+export const CUMPLIMIENTOS = ["PENDIENTE", "OK", "NO_OK", "NO_APLICA"] as const;
+export type Cumplimiento = (typeof CUMPLIMIENTOS)[number];
+export const ETIQUETA_CUMPLIMIENTO: Record<Cumplimiento, string> = {
+  PENDIENTE: "Sin revisar",
+  OK: "OK",
+  NO_OK: "No OK",
+  NO_APLICA: "No aplica",
+};
+
+export const ESTADOS_CORRECCION = ["PENDIENTE", "EN_CURSO", "RESUELTO", "VERIFICADO"] as const;
+export type EstadoCorreccion = (typeof ESTADOS_CORRECCION)[number];
+export const ETIQUETA_ESTADO_CORRECCION: Record<EstadoCorreccion, string> = {
+  PENDIENTE: "Pendiente",
+  EN_CURSO: "En curso",
+  RESUELTO: "Resuelto",
+  VERIFICADO: "Verificado",
+};
+
+export const ESTADOS_INSPECCION = ["ABIERTA", "CERRADA"] as const;
+export type EstadoInspeccion = (typeof ESTADOS_INSPECCION)[number];
+export const ETIQUETA_ESTADO_INSPECCION: Record<EstadoInspeccion, string> = {
+  ABIERTA: "Abierta",
+  CERRADA: "Cerrada",
+};
