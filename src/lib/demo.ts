@@ -40,21 +40,21 @@ const TIENDAS = [
     nombre: "Vega Altamira", codigo: "ALT", ciudad: "San Bernardo", formato: "Hipermercado",
     metrosCuadrados: 3200, aperturaHaceMeses: 96,
     base: 2_950_000, rpt: 36.5, upt: 3.1, margen: 22.8, logro: 1.04,
-    merma: 0.95, dañada: 0.05, carga: 0.19, inventario: 0.14,
+    merma: 0.82, dañada: 0.05, carga: 0.19, inventario: 0.14,
     alias: "Altamira\nSUC. ALTAMIRA",
   },
   {
     nombre: "Vega Los Robles", codigo: "ROB", ciudad: "San Bernardo", formato: "Supermercado",
     metrosCuadrados: 1850, aperturaHaceMeses: 72,
     base: 2_180_000, rpt: 24.2, upt: 2.4, margen: 20.1, logro: 1.01,
-    merma: 1.18, dañada: 0.07, carga: 0.24, inventario: 0.18,
+    merma: 0.96, dañada: 0.07, carga: 0.24, inventario: 0.18,
     alias: "Los Robles\nSUC. ROBLES",
   },
   {
     nombre: "Vega Costa Verde", codigo: "CVE", ciudad: "Puerto Lindo", formato: "Supermercado",
     metrosCuadrados: 2100, aperturaHaceMeses: 54,
     base: 1_920_000, rpt: 31.8, upt: 2.8, margen: 21.4, logro: 0.98,
-    merma: 1.05, dañada: 0.06, carga: 0.28, inventario: 0.21,
+    merma: 0.91, dañada: 0.06, carga: 0.26, inventario: 0.20,
     estacional: true,
     alias: "Costa Verde\nCOSTAVERDE",
   },
@@ -62,14 +62,14 @@ const TIENDAS = [
     nombre: "Vega San Marcos", codigo: "SMA", ciudad: "San Marcos", formato: "Supermercado",
     metrosCuadrados: 1620, aperturaHaceMeses: 63,
     base: 1_640_000, rpt: 22.6, upt: 2.2, margen: 16.9, logro: 0.93,
-    merma: 1.84, dañada: 0.11, carga: 0.38, inventario: 0.42,
+    merma: 1.12, dañada: 0.09, carga: 0.34, inventario: 0.31,
     alias: "San Marcos\nSUC. SAN MARCOS",
   },
   {
     nombre: "Vega Puerto Nuevo", codigo: "PNU", ciudad: "Puerto Lindo", formato: "Supermercado",
     metrosCuadrados: 1740, aperturaHaceMeses: 5,
     base: 1_120_000, rpt: 26.9, upt: 2.5, margen: 19.2, logro: 0.96,
-    merma: 1.32, dañada: 0.09, carga: 0.31, inventario: 0.26,
+    merma: 1.04, dañada: 0.08, carga: 0.29, inventario: 0.24,
     rampa: true,
     alias: "Puerto Nuevo\nPTO NUEVO",
   },
@@ -77,7 +77,7 @@ const TIENDAS = [
     nombre: "Vega Mirador", codigo: "MIR", ciudad: "El Mirador", formato: "Exprés",
     metrosCuadrados: 980, aperturaHaceMeses: 41,
     base: 1_310_000, rpt: 29.4, upt: 2.6, margen: 23.6, logro: 1.06,
-    merma: 0.78, dañada: 0.04, carga: 0.16, inventario: 0.11,
+    merma: 0.71, dañada: 0.04, carga: 0.16, inventario: 0.11,
     alias: "Mirador\nSUC. MIRADOR",
   },
 ];
@@ -354,6 +354,8 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   await sembrarBenchmarks(prisma);
   await sembrarPerfil(prisma, zonaPropia.id);
   await sembrarPlanes(prisma, zonaPropia.id, tiendas, corteActual.id);
+  await sembrarNotas(prisma, zonaPropia.id, tiendas);
+  await sembrarAlertas(prisma, corteActual.id, corteMedio.id, tiendas);
 
   return {
     cortes: todos.length,
@@ -458,13 +460,13 @@ async function sembrarPlanes(
       oportunidadUsd: 96_400,
       diagnostico:
         "San Marcos cierra con 16,9 % de margen bruto contra 22,0 % de referencia y 20,7 % de " +
-        "la zona. La merma va en 1,84 % de ventas, casi el doble de la mediana de la zona, y el " +
-        "ajuste de inventario es el más alto de las seis tiendas. El ticket promedio de $22,6 es " +
+        "la zona. La merma va en 1,12 % de ventas, la más alta de la zona, y el " +
+        "ajuste de inventario también encabeza las seis tiendas. El ticket promedio de $22,6 es " +
         "el más bajo, pero el problema no es de venta sino de lo que se pierde antes de venderla.",
       metas: {
         create: [
           { indicador: "Margen bruto", valorActual: 16.9, valorObjetivo: 19.5, unidad: "PORCENTAJE" },
-          { indicador: "Merma sobre ventas", valorActual: 1.84, valorObjetivo: 1.15, unidad: "PORCENTAJE" },
+          { indicador: "Merma sobre ventas", valorActual: 1.12, valorObjetivo: 0.85, unidad: "PORCENTAJE" },
           { indicador: "Oportunidad recuperable", valorActual: 0, valorObjetivo: 96_400, unidad: "USD" },
         ],
       },
@@ -531,5 +533,115 @@ async function sembrarPlanes(
         ],
       },
     },
+  });
+}
+
+
+/**
+ * Un año de datos perfectos no existe, y una pantalla de alertas vacía no demuestra nada:
+ * lo que distingue a esta herramienta de una hoja de cálculo es que encuentra lo que no
+ * cuadra. El corte en curso lleva dos incidencias de las que pasan de verdad, y el motor
+ * las detecta por su cuenta — las alertas no se escriben a mano.
+ *
+ * Las dos son de ajuste, no de venta, a propósito: un Meta y Real invertidos dejaría una
+ * tienda al 240 % en el tablero de portada, y quien lo ve por primera vez no piensa "la
+ * aplicación detectó un error", piensa que la aplicación está rota.
+ */
+async function sembrarAlertas(
+  prisma: PrismaClient,
+  corteActualId: string,
+  corteMedioId: string,
+  tiendas: { perfil: (typeof TIENDAS)[number]; fila: { id: string } }[],
+) {
+  const porCodigo = (codigo: string) => tiendas.find((t) => t.perfil.codigo === codigo)!.fila.id;
+
+  const incidencias = [
+    // Un conteo cíclico que se cargó completo de golpe en vez de repartido.
+    { tiendaId: porCodigo("SMA"), tipologia: "INVENTARIO", porcentaje: -3.4 },
+    // Una cadena de frío que falló un fin de semana.
+    { tiendaId: porCodigo("CVE"), tipologia: "MERMA", porcentaje: -4.1 },
+  ];
+
+  for (const incidencia of incidencias) {
+    const venta = (
+      await prisma.registroVentas.findUnique({
+        where: { corteId_tiendaId: { corteId: corteActualId, tiendaId: incidencia.tiendaId } },
+      })
+    )?.ventasReal;
+    await prisma.registroAjuste.update({
+      where: {
+        corteId_tiendaId_tipologia: {
+          corteId: corteActualId,
+          tiendaId: incidencia.tiendaId,
+          tipologia: incidencia.tipologia,
+        },
+      },
+      data: {
+        porcentaje: incidencia.porcentaje,
+        monto: Math.round(((venta ?? 0) * incidencia.porcentaje) / 100),
+      },
+    });
+  }
+
+  const { sincronizarAlertas } = await import("@/lib/validacion");
+  await sincronizarAlertas(corteActualId);
+  await sincronizarAlertas(corteMedioId);
+
+  // Una del corte anterior ya atendida: se ve que las decisiones humanas quedan registradas
+  // y que el motor no vuelve a levantar lo que alguien ya revisó.
+  const revisable = await prisma.alerta.findFirst({
+    where: { corteId: corteMedioId, estado: "ABIERTA" },
+    orderBy: { severidad: "asc" },
+  });
+  if (revisable) {
+    await prisma.alerta.update({
+      where: { id: revisable.id },
+      data: {
+        estado: "REVISADA",
+        nota: "Confirmado con la tienda: fue una liquidación de temporada autorizada, no un error de registro.",
+      },
+    });
+  }
+}
+
+/** Lo que el usuario sabe y la data no dice. Alimenta el contexto del análisis. */
+async function sembrarNotas(
+  prisma: PrismaClient,
+  zonaId: string,
+  tiendas: { perfil: (typeof TIENDAS)[number]; fila: { id: string } }[],
+) {
+  const porCodigo = (codigo: string) => tiendas.find((t) => t.perfil.codigo === codigo)!.fila.id;
+
+  await prisma.notaMemoria.createMany({
+    data: [
+      {
+        texto:
+          "Puerto Nuevo abrió en abril. Hasta que cumpla doce meses no entra en el comparativo " +
+          "interanual: su crecimiento es rampa de apertura, no desempeño.",
+        etiqueta: "OPERACION",
+        tiendaId: porCodigo("PNU"),
+      },
+      {
+        texto:
+          "San Marcos arrastra un problema de margen desde el cambio de proveedor de carnes " +
+          "en febrero. El plan de acción está abierto.",
+        etiqueta: "COMERCIAL",
+        tiendaId: porCodigo("SMA"),
+      },
+      {
+        texto:
+          "Costa Verde es estacional: julio, agosto y diciembre pesan el doble que el resto " +
+          "del año por el turismo. Leer sus caídas de mayo y septiembre en ese contexto.",
+        etiqueta: "OPERACION",
+        tiendaId: porCodigo("CVE"),
+      },
+      {
+        texto:
+          "El cierre de mes de la zona se revisa el primer martes. Los cortes acumulados de " +
+          "mitad de mes son de seguimiento, no de logro.",
+        etiqueta: "OPERACION",
+        zonaId,
+      },
+    ],
   });
 }
