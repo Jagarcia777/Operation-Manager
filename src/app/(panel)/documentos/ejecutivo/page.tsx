@@ -50,11 +50,31 @@ export default async function InformeEjecutivoPage({
 
   // Los cortes son acumulados al día, así que la comparación válida es el ritmo diario:
   // contrastar el acumulado al 23 contra el acumulado al 12 mediría días, no desempeño.
-  const ritmoActual = ritmoDiario(zona.ventasReal, corte.diasTranscurridos);
-  const ritmoAnterior = ritmoDiario(
-    datos.zonaAnterior?.subtotal.ventasReal ?? null,
-    datos.corteAnterior?.diasTranscurridos,
+  //
+  // Y se compara solo lo comparable: una tienda sin venta en alguno de los dos cortes falsea
+  // el total de la zona, porque el de hoy la excluye y el de antes la incluía. Sacarla de los
+  // dos lados mantiene honesta la variación; cuántas quedaron fuera se dice bajo la tabla.
+  const paresZona = zonaPropia.tiendas.map((tienda) => ({
+    actual: tienda.ventasReal,
+    previo:
+      datos.zonaAnterior?.tiendas.find((fila) => fila.tiendaId === tienda.tiendaId)?.ventasReal ??
+      null,
+  }));
+  const comparables = paresZona.filter(
+    (par): par is { actual: number; previo: number } => par.actual !== null && par.previo !== null,
   );
+  const tiendasFueraDeComparacion = datos.zonaAnterior ? paresZona.length - comparables.length : 0;
+  const sumar = (valores: number[]) => valores.reduce((total, valor) => total + valor, 0);
+
+  const ritmoActual = comparables.length
+    ? ritmoDiario(sumar(comparables.map((par) => par.actual)), corte.diasTranscurridos)
+    : null;
+  const ritmoAnterior = comparables.length
+    ? ritmoDiario(
+        sumar(comparables.map((par) => par.previo)),
+        datos.corteAnterior?.diasTranscurridos,
+      )
+    : null;
   const variacionZona =
     ritmoActual !== null && ritmoAnterior
       ? ((ritmoActual - ritmoAnterior) / ritmoAnterior) * 100
@@ -391,7 +411,14 @@ export default async function InformeEjecutivoPage({
                   );
                 })}
                 <tr className="fila-total">
-                  <td>{zonaPropia.zona}</td>
+                  <td>
+                    {zonaPropia.zona}
+                    {tiendasFueraDeComparacion > 0 && (
+                      <span className="ml-2 text-xs font-normal text-texto-3">
+                        solo tiendas comparables
+                      </span>
+                    )}
+                  </td>
                   <td className="cifra">{moneda(ritmoAnterior)}</td>
                   <td className="cifra">{moneda(ritmoActual)}</td>
                   <td className={`cifra ${(variacionZona ?? 0) >= 0 ? "text-exito" : "text-alerta"}`}>
@@ -403,6 +430,15 @@ export default async function InformeEjecutivoPage({
           </div>
         ) : (
           <EstadoVacio mensaje="No hay un corte anterior comparable cargado." />
+        )}
+        {tiendasFueraDeComparacion > 0 && (
+          <p className="text-xs text-atencion">
+            {tiendasFueraDeComparacion === 1
+              ? "1 tienda queda fuera del total"
+              : `${tiendasFueraDeComparacion} tiendas quedan fuera del total`}{" "}
+            por no tener venta en alguno de los dos cortes. Incluirlas en un lado y no en el otro
+            haría parecer que la zona cayó.
+          </p>
         )}
         <p className="text-xs text-texto-3">
           El análisis por día de la semana requiere venta diaria, que hoy no se carga. Con cortes
