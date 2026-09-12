@@ -125,69 +125,74 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   // ── Catálogo ────────────────────────────────────────────────────────────────
   const zonaPropia = await prisma.zona.create({ data: ZONA_PROPIA });
 
-  const zonasComparacion = [];
-  for (const zona of ZONAS_COMPARACION) {
-    const { tiendas, base, ...datos } = zona;
-    zonasComparacion.push({
-      ...(await prisma.zona.create({ data: datos })),
-      tiendasDeclaradas: tiendas,
-      base,
-    });
-  }
+  // createManyAndReturn en vez de un create por fila: cada ida a la base cuesta decenas de
+  // milisegundos desde una función serverless, y aquí se hacían cuarenta seguidas.
+  const creadas = await prisma.zona.createManyAndReturn({
+    // `tiendas` y `base` describen la zona para generar sus cifras, pero no son columnas.
+    data: ZONAS_COMPARACION.map((zona) => ({
+      nombre: zona.nombre,
+      gerente: zona.gerente,
+      orden: zona.orden,
+      detallada: zona.detallada,
+    })),
+  });
+  const zonasComparacion = creadas.map((zona) => {
+    const definicion = ZONAS_COMPARACION.find((z) => z.nombre === zona.nombre)!;
+    return { ...zona, tiendasDeclaradas: definicion.tiendas, base: definicion.base };
+  });
 
   const hoy = new Date();
-  const tiendas = [];
-  for (const [indice, tienda] of TIENDAS.entries()) {
-    const apertura = new Date(hoy);
-    apertura.setMonth(apertura.getMonth() - tienda.aperturaHaceMeses);
-    tiendas.push({
-      perfil: tienda,
-      fila: await prisma.tienda.create({
-        data: {
-          nombre: tienda.nombre,
-          codigo: tienda.codigo,
-          alias: tienda.alias,
-          ciudad: tienda.ciudad,
-          formato: tienda.formato,
-          metrosCuadrados: tienda.metrosCuadrados,
-          fechaApertura: apertura,
-          zonaId: zonaPropia.id,
-          orden: indice + 1,
-        },
-      }),
-    });
-  }
+  const filasTienda = await prisma.tienda.createManyAndReturn({
+    data: TIENDAS.map((tienda, indice) => {
+      const apertura = new Date(hoy);
+      apertura.setMonth(apertura.getMonth() - tienda.aperturaHaceMeses);
+      return {
+        nombre: tienda.nombre,
+        codigo: tienda.codigo,
+        alias: tienda.alias,
+        ciudad: tienda.ciudad,
+        formato: tienda.formato,
+        metrosCuadrados: tienda.metrosCuadrados,
+        fechaApertura: apertura,
+        zonaId: zonaPropia.id,
+        orden: indice + 1,
+      };
+    }),
+  });
+  const tiendas = TIENDAS.map((perfil) => ({
+    perfil,
+    fila: filasTienda.find((fila) => fila.nombre === perfil.nombre)!,
+  }));
 
-  const categorias = [];
-  for (const [indice, categoria] of CATEGORIAS.entries()) {
-    categorias.push({
-      perfil: categoria,
-      fila: await prisma.categoria.create({
-        data: { nombre: categoria.nombre, orden: indice + 1 },
-      }),
-    });
-  }
+  const filasCategoria = await prisma.categoria.createManyAndReturn({
+    data: CATEGORIAS.map((categoria, indice) => ({
+      nombre: categoria.nombre,
+      orden: indice + 1,
+    })),
+  });
+  const categorias = CATEGORIAS.map((perfil) => ({
+    perfil,
+    fila: filasCategoria.find((fila) => fila.nombre === perfil.nombre)!,
+  }));
 
   // ── Doce cierres de mes, del más viejo al más reciente ──────────────────────
-  const cortes = [];
-  for (let atras = 12; atras >= 1; atras--) {
-    const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - atras, 1);
-    const fin = new Date(hoy.getFullYear(), hoy.getMonth() - atras + 1, 0);
-    const diasDelMes = fin.getDate();
-    cortes.push(
-      await prisma.corte.create({
-        data: {
-          nombre: `${MESES[inicio.getMonth()]} ${inicio.getFullYear()}`,
-          tipo: "CIERRE_MES",
-          fechaInicio: inicio,
-          fechaFin: fin,
-          estado: "CERRADO",
-          diasDelMes,
-          diasTranscurridos: diasDelMes,
-        },
-      }),
-    );
-  }
+  const cortes = await prisma.corte.createManyAndReturn({
+    data: Array.from({ length: 12 }, (_, indice) => {
+      const atras = 12 - indice;
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - atras, 1);
+      const fin = new Date(hoy.getFullYear(), hoy.getMonth() - atras + 1, 0);
+      const diasDelMes = fin.getDate();
+      return {
+        nombre: `${MESES[inicio.getMonth()]} ${inicio.getFullYear()}`,
+        tipo: "CIERRE_MES",
+        fechaInicio: inicio,
+        fechaFin: fin,
+        estado: "CERRADO",
+        diasDelMes,
+        diasTranscurridos: diasDelMes,
+      };
+    }),
+  });
 
   // Y el mes en curso, abierto, con dos cortes acumulados: es el que se trabaja.
   const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
@@ -367,24 +372,28 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   };
 }
 
-/** Borra los datos pero no toca la tabla de migraciones: la estructura se queda como está. */
+/**
+ * Vacía el contenido sin tocar la estructura. Se hace por barrido del esquema y no con una
+ * lista de modelos a propósito: la lista se olvida. Ya pasó —los checklists se añadieron al
+ * modelo y no a esta función, y la segunda carga del demo reventaba contra el nombre único—,
+ * y el próximo modelo que se agregue volvería a olvidarse.
+ *
+ * TRUNCATE ... CASCADE en una sola ida a la base, en vez de quince deleteMany encadenados por
+ * orden de dependencia: más rápido y sin orden que mantener.
+ */
 export async function vaciarDatos(prisma: PrismaClient) {
-  await prisma.metaPlan.deleteMany();
-  await prisma.hitoPlan.deleteMany();
-  await prisma.planAccion.deleteMany();
-  await prisma.alerta.deleteMany();
-  await prisma.analisis.deleteMany();
-  await prisma.notaMemoria.deleteMany();
-  await prisma.extraccion.deleteMany();
-  await prisma.registroCategoria.deleteMany();
-  await prisma.registroAjuste.deleteMany();
-  await prisma.registroVentas.deleteMany();
-  await prisma.registroZona.deleteMany();
-  await prisma.corte.deleteMany();
-  await prisma.categoria.deleteMany();
-  await prisma.tienda.deleteMany();
-  await prisma.perfil.deleteMany();
-  await prisma.zona.deleteMany();
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE tabla text;
+    BEGIN
+      FOR tabla IN
+        SELECT tablename FROM pg_tables
+        WHERE schemaname = current_schema() AND tablename <> '_prisma_migrations'
+      LOOP
+        EXECUTE format('TRUNCATE TABLE %I CASCADE', tabla);
+      END LOOP;
+    END $$;
+  `);
 }
 
 const UMBRALES = [

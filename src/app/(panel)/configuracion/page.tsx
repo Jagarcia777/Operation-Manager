@@ -31,6 +31,14 @@ import {
   guardarZona,
 } from "./acciones";
 
+/**
+ * Cargar la demostración escribe un año de datos. Son unas cuarenta y cinco idas a la base, y
+ * cada una cuesta decenas de milisegundos desde una función serverless contra una base que
+ * puede estar en otra región: con el límite por defecto se queda a medias y el usuario ve un
+ * error de servidor sin explicación.
+ */
+export const maxDuration = 60;
+
 const SECCIONES = [
   { clave: "perfil", etiqueta: "Perfil" },
   { clave: "catalogo", etiqueta: "Zonas y tiendas" },
