@@ -125,8 +125,12 @@ h2 {
   letter-spacing: -0.022em;
 }
 
-a {
-  color: inherit;
+/* Va en @layer base: sin capa, esta regla gana sobre .boton-primario y deja el texto
+   oscuro sobre el azul del botón. */
+@layer base {
+  a {
+    color: inherit;
+  }
 }
 
 ::selection {

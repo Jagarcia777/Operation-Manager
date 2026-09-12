@@ -81,7 +81,11 @@ export function BarraLateral({
       <div className="hidden items-center gap-2.5 px-3 pb-5 md:flex">
         <Monograma iniciales={iniciales} tamano={34} />
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold tracking-[-0.02em]">{marca}</p>
+          {/* Dos líneas antes que un truncado: "Operation Mana…" en la cabecera de la
+              aplicación es lo primero que se ve y lo primero que resta. */}
+          <p className="text-[15px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
+            {marca}
+          </p>
           <p className="truncate text-xs text-texto-3">Control de operaciones</p>
         </div>
       </div>

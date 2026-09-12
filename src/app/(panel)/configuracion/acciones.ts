@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { verificarContrasena } from "@/lib/auth-contrasena";
 import { prisma } from "@/lib/db";
 import { generarDemo, vaciarDatos } from "@/lib/demo";
 import { ESTADOS_CORTE, TIPOS_CORTE, type EstadoCorte, type TipoCorte } from "@/lib/dominio";
@@ -178,24 +179,36 @@ export async function archivarNota(formData: FormData) {
  * de confirmación: un clic accidental no puede vaciar un año de cortes.
  */
 export async function cargarDatosDemo(formData: FormData) {
-  exigirConfirmacion(formData, "DEMO");
+  if (!(await claveCorrecta(formData))) {
+    redirect("/configuracion?seccion=datos&error=clave");
+  }
   await generarDemo(prisma);
   revalidarTodo();
-  redirect("/?demo=cargado");
+  redirect("/?bienvenida=demo");
 }
 
 export async function vaciarAplicacion(formData: FormData) {
-  exigirConfirmacion(formData, "BORRAR");
+  if (!(await claveCorrecta(formData))) {
+    redirect("/configuracion?seccion=datos&error=clave");
+  }
   await vaciarDatos(prisma);
   revalidarTodo();
   redirect("/configuracion?seccion=datos&hecho=vaciado");
 }
 
-function exigirConfirmacion(formData: FormData, palabra: string) {
-  const escrito = String(formData.get("confirmacion") ?? "").trim().toUpperCase();
-  if (escrito !== palabra) {
-    throw new Error(`Para continuar hay que escribir ${palabra} en la casilla de confirmación.`);
-  }
+/**
+ * Las dos acciones de esta sección borran todo y no hay vuelta atrás, así que piden la
+ * contraseña de acceso otra vez. Escribir una palabra no bastaba: quien esté mirando la
+ * aplicación la escribe sin pensar, y un clic de curiosidad se lleva un año de cortes.
+ *
+ * Devuelve un booleano en vez de lanzar: una excepción en una acción de servidor llega al
+ * navegador como "Application error" con un código hexadecimal y sin salida.
+ */
+async function claveCorrecta(formData: FormData) {
+  const hash = process.env.APP_PASSWORD_HASH;
+  const escrita = String(formData.get("clave") ?? "");
+  if (!hash || !escrita) return false;
+  return verificarContrasena(escrita, hash);
 }
 
 function revalidarTodo() {

@@ -15,14 +15,16 @@ export async function subirYExtraer(formData: FormData) {
   const destino = String(formData.get("destino") ?? "VENTAS");
   const archivo = formData.get("archivo");
 
+  // Se responde con un mensaje en la pantalla, no con una excepción: un error de servidor
+  // llega al navegador como "Application error" y un archivo equivocado no merece eso.
   if (!corteId || !(archivo instanceof File) || archivo.size === 0) {
-    throw new Error("Falta el corte o el archivo.");
+    redirect("/cargar?error=falta");
   }
   if (!TIPOS_ACEPTADOS[archivo.type]) {
-    throw new Error("Solo se aceptan PDF, PNG, JPG o WEBP.");
+    redirect("/cargar?error=tipo");
   }
   if (archivo.size > TAMANO_MAXIMO) {
-    throw new Error("El archivo supera los 4 MB.");
+    redirect("/cargar?error=peso");
   }
 
   const buffer = Buffer.from(await archivo.arrayBuffer());

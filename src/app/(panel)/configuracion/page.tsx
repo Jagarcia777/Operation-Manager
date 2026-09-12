@@ -59,7 +59,12 @@ export default async function ConfiguracionPage({ searchParams }: PageProps<"/co
       {seccion === "umbrales" && <SeccionUmbrales />}
       {seccion === "benchmarks" && <SeccionBenchmarks />}
       {seccion === "memoria" && <SeccionMemoria />}
-      {seccion === "datos" && <SeccionDatos />}
+      {seccion === "datos" && (
+        <SeccionDatos
+          error={typeof parametros.error === "string" ? parametros.error : null}
+          hecho={typeof parametros.hecho === "string" ? parametros.hecho : null}
+        />
+      )}
       {!["catalogo", "cortes", "umbrales", "benchmarks", "memoria", "datos"].includes(seccion) && (
         <SeccionPerfil />
       )}
@@ -545,15 +550,30 @@ async function SeccionMemoria() {
   );
 }
 
-async function SeccionDatos() {
+async function SeccionDatos({ error, hecho }: { error: string | null; hecho: string | null }) {
   const [cortes, tiendas, registros] = await Promise.all([
     prisma.corte.count(),
     prisma.tienda.count(),
     prisma.registroVentas.count(),
   ]);
 
+  const AVISOS: Record<string, string> = {
+    clave: "La contraseña no coincide. Nada se tocó.",
+  };
+
   return (
     <div className="max-w-3xl space-y-4">
+      {error && AVISOS[error] && (
+        <p className="tarjeta border-alerta-tenue bg-alerta-tenue px-4 py-3 text-sm text-alerta">
+          {AVISOS[error]}
+        </p>
+      )}
+      {hecho === "vaciado" && (
+        <p className="tarjeta border-exito-tenue bg-exito-tenue px-4 py-3 text-sm text-exito">
+          La aplicación quedó vacía. Carga la demostración o sube tu primer corte en Cargar datos.
+        </p>
+      )}
+
       <div className="tarjeta p-5">
         <h2 className="text-sm font-semibold">Lo que hay cargado ahora</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -578,14 +598,19 @@ async function SeccionDatos() {
           Sirve para recorrer la herramienta llena antes de meter tus números.
         </p>
         <p className="text-sm text-alerta">
-          Esto elimina los datos actuales. No hay forma de recuperarlos.
+          Esto elimina los datos actuales y no hay forma de recuperarlos. Por eso pide la
+          contraseña: para que nadie vacíe la aplicación de un clic.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="block text-sm">
-            <span className="text-texto-2">
-              Escribe <strong>DEMO</strong> para confirmar
-            </span>
-            <input name="confirmacion" className="campo mt-1.5 w-40" autoComplete="off" required />
+            <span className="text-texto-2">Tu contraseña de acceso</span>
+            <input
+              name="clave"
+              type="password"
+              className="campo mt-1.5 w-56"
+              autoComplete="current-password"
+              required
+            />
           </label>
           <button type="submit" className="boton boton-primario">
             Cargar demostración
@@ -601,10 +626,14 @@ async function SeccionDatos() {
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="block text-sm">
-            <span className="text-texto-2">
-              Escribe <strong>BORRAR</strong> para confirmar
-            </span>
-            <input name="confirmacion" className="campo mt-1.5 w-40" autoComplete="off" required />
+            <span className="text-texto-2">Tu contraseña de acceso</span>
+            <input
+              name="clave"
+              type="password"
+              className="campo mt-1.5 w-56"
+              autoComplete="current-password"
+              required
+            />
           </label>
           <button type="submit" className="boton boton-secundario text-alerta">
             Vaciar todo

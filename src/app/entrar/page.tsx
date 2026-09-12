@@ -2,17 +2,28 @@ import { Monograma } from "@/components/Monograma";
 import { prisma } from "@/lib/db";
 import { entrar } from "./acciones";
 
-/** La entrada debe dibujarse aunque la base no esté disponible todavía. */
+const MARCA_POR_DEFECTO = { nombre: "Operation Manager", iniciales: "OM" };
+
+/**
+ * La entrada debe dibujarse aunque la base no esté disponible todavía, y sobre todo rápido:
+ * una base serverless que estaba dormida tarda un par de segundos en despertar, y esta es la
+ * primera pantalla que ve alguien. Si no contesta a tiempo se entra con la marca por defecto;
+ * el nombre real aparece en la siguiente pantalla y nadie se queda mirando un blanco.
+ */
 async function leerMarca() {
-  try {
-    const perfil = await prisma.perfil.findUnique({ where: { id: "maestro" } });
-    return {
-      nombre: perfil?.marca || "Operation Manager",
-      iniciales: perfil?.iniciales || "OM",
-    };
-  } catch {
-    return { nombre: "Operation Manager", iniciales: "OM" };
-  }
+  const consulta = prisma.perfil
+    .findUnique({ where: { id: "maestro" } })
+    .then((perfil) => ({
+      nombre: perfil?.marca || MARCA_POR_DEFECTO.nombre,
+      iniciales: perfil?.iniciales || MARCA_POR_DEFECTO.iniciales,
+    }))
+    .catch(() => MARCA_POR_DEFECTO);
+
+  const limite = new Promise<typeof MARCA_POR_DEFECTO>((resolver) =>
+    setTimeout(() => resolver(MARCA_POR_DEFECTO), 1500),
+  );
+
+  return Promise.race([consulta, limite]);
 }
 
 const MENSAJES: Record<string, string> = {

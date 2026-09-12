@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EstadoVacio } from "@/components/EstadoVacio";
+import { Monograma } from "@/components/Monograma";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
 import { GraficoBarras } from "@/components/graficos/GraficoBarras";
 import { GraficoEvolucion } from "@/components/graficos/GraficoEvolucion";
@@ -18,15 +18,52 @@ import {
 
 // Pantalla de inicio: gestión por excepción. Lo primero que se ve es lo que se salió de rango,
 // no las 24 tiendas en orden.
-export default async function InicioPage() {
+export default async function InicioPage({ searchParams }: PageProps<"/">) {
+  const parametros = await searchParams;
+  const recienCargado = parametros.bienvenida === "demo";
   const [perfil, corte] = await Promise.all([
     prisma.perfil.findUnique({ where: { id: "maestro" } }),
     resolverCorte(),
   ]);
 
+  // Primera vez: en vez de un mensaje sin salida, los dos caminos que hay.
   if (!corte) {
     return (
-      <EstadoVacio mensaje="Todavía no hay cortes cargados. Empieza subiendo el Dashboard Ejecutivo en Cargar datos." />
+      <div className="mx-auto max-w-2xl py-10 text-center">
+        <Monograma iniciales={perfil?.iniciales || "OM"} tamano={52} />
+        <h1 className="mt-4 text-2xl">
+          {perfil?.marca || "Operation Manager"} está listo
+        </h1>
+        <p className="mx-auto mt-2 max-w-lg text-sm text-texto-2">
+          Todavía no hay ningún corte cargado. Puedes empezar por tus propios números o recorrer
+          la aplicación con una cadena de demostración para ver cómo queda todo lleno.
+        </p>
+
+        <div className="mt-7 grid gap-3 text-left sm:grid-cols-2">
+          <Link href="/cargar" className="tarjeta tarjeta-pulsable block p-5">
+            <p className="text-sm font-semibold">Subir mi primer corte</p>
+            <p className="mt-1.5 text-sm text-texto-2">
+              El Dashboard Ejecutivo en PDF o imagen; la aplicación lee las cifras por tienda y
+              tú confirmas antes de guardar.
+            </p>
+            <span className="mt-3 inline-block text-sm text-acento-enlace">Ir a Cargar datos →</span>
+          </Link>
+
+          <Link
+            href="/configuracion?seccion=datos"
+            className="tarjeta tarjeta-pulsable block p-5"
+          >
+            <p className="text-sm font-semibold">Ver una demostración</p>
+            <p className="mt-1.5 text-sm text-texto-2">
+              Una cadena inventada con seis tiendas y un año de historia, para recorrer los
+              tableros, las alertas y los informes con datos dentro.
+            </p>
+            <span className="mt-3 inline-block text-sm text-acento-enlace">
+              Ir a Configuración → Datos →
+            </span>
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -55,6 +92,14 @@ export default async function InicioPage() {
 
   return (
     <div className="space-y-6">
+      {recienCargado && (
+        <div className="tarjeta border-acento-tenue bg-acento-tenue px-4 py-3 text-sm text-acento">
+          <strong className="font-semibold">Estás viendo datos de demostración.</strong> Una cadena
+          inventada con un año de historia, para recorrer la aplicación llena. Cuando quieras
+          poner los tuyos, vacíala desde Configuración → Datos y sube tu primer corte.
+        </div>
+      )}
+
       <header>
         <h1 className="text-2xl">Hola, {(perfil?.nombre ?? "").split(" ")[0] || "bienvenido"}</h1>
         <p className="mt-1 text-sm text-texto-2">

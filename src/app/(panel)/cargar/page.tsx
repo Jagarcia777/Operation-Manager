@@ -16,6 +16,12 @@ const ESTADO_TEXTO: Record<string, string> = {
   ERROR: "Con error",
 };
 
+const AVISOS: Record<string, string> = {
+  falta: "Elige un corte y un archivo antes de continuar.",
+  tipo: "Ese formato no se puede leer. Acepta PDF, PNG, JPG o WEBP.",
+  peso: "El archivo supera los 4 MB. Exporta solo la página del tablero, o manda la foto en tamaño mediano.",
+};
+
 const ESTADO_TONO: Record<string, string> = {
   PENDIENTE: "bg-superficie-3 text-texto-2",
   EXTRAIDO: "bg-acento-tenue text-acento",
@@ -23,7 +29,9 @@ const ESTADO_TONO: Record<string, string> = {
   ERROR: "bg-alerta-tenue text-alerta",
 };
 
-export default async function CargarPage() {
+export default async function CargarPage({ searchParams }: PageProps<"/cargar">) {
+  const parametros = await searchParams;
+  const error = typeof parametros.error === "string" ? parametros.error : null;
   const [cortes, extracciones] = await Promise.all([
     listarCortes(),
     prisma.extraccion.findMany({
@@ -51,6 +59,12 @@ export default async function CargarPage() {
           { href: "/cargar/manual", etiqueta: "Captura manual", activa: false },
         ]}
       />
+
+      {error && AVISOS[error] && (
+        <p className="tarjeta border-alerta-tenue bg-alerta-tenue px-4 py-3 text-sm text-alerta">
+          {AVISOS[error]}
+        </p>
+      )}
 
       {!conClave && (
         <div className="tarjeta border-atencion-tenue bg-atencion-tenue px-4 py-3 text-sm text-atencion">
