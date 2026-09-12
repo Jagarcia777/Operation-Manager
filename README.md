@@ -93,10 +93,13 @@ estén vacías. Para pasar a tus datos:
 3. **Configura las variables de entorno** en el proyecto de Vercel: `DATABASE_URL`,
    `DIRECT_URL` (si tu proveedor la da), `APP_PASSWORD_HASH`, `SESSION_SECRET` y, si vas a usar
    la lectura con IA, `ANTHROPIC_API_KEY`. Genera las dos del medio con `npm run auth:hash`.
-4. **Despliega.** El script `vercel-build` aplica las migraciones y compila, así que la base queda
-   al día en cada despliegue sin pasos manuales.
-5. **Carga el catálogo** la primera vez, apuntando a la base de producción desde tu equipo:
-   `npm run db:seed`.
+   Ponlas en el proyecto, no en el equipo, y marca los tres entornos. Vercel congela las
+   variables en cada despliegue: si las cambias después, hay que volver a desplegar para que el
+   sitio las vea.
+4. **Despliega.** El script `vercel-build` aplica las migraciones, carga el catálogo de Zona
+   Oriente si la base está vacía y compila. No hay pasos manuales: la primera vez que despliegas,
+   las seis tiendas, las zonas de comparación y las categorías quedan puestas. En los despliegues
+   siguientes el catálogo no se toca, así que lo que edites desde Configuración manda.
 
 Los documentos que subes se guardan en la base y no en disco, porque en Vercel el sistema de
 archivos es de solo lectura y se reinicia en cada despliegue.
@@ -118,7 +121,8 @@ npm run build           # build de producción
 npm run lint            # eslint
 npm start               # servir el build de producción
 npm run auth:hash       # generar contraseña y secreto de sesión
-npm run db:seed         # recargar el catálogo y los datos de ejemplo
+npm run db:seed         # catálogo y datos de ejemplo
+npm run db:catalogo     # solo el catálogo, y solo si la base está vacía
 npm run db:reset        # recrear la base desde cero
 npx prisma studio       # ver y editar la base
 ```

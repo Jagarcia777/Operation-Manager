@@ -12,6 +12,15 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
+/**
+ * Con `--solo-catalogo` se siembra únicamente lo que la aplicación necesita para arrancar
+ * —zonas, tiendas, categorías, umbrales, benchmarks y perfil— y solo si la base está vacía.
+ * Es el modo que corre en cada despliegue, y por eso tiene que ser inofensivo al repetirse:
+ * los upsert buscan por nombre, así que volver a sembrar sobre una zona ya renombrada crearía
+ * un duplicado con el nombre viejo. Los cortes de ejemplo quedan fuera en este modo.
+ */
+const SOLO_CATALOGO = process.argv.includes("--solo-catalogo");
+
 // Zona Oriente se gestiona tienda por tienda. Los nombres son los reales de la cadena; los alias
 // recogen cómo aparece cada sucursal en otros reportes.
 const ZONA_ORIENTE = {
@@ -99,6 +108,11 @@ function pseudoAleatorio(semilla: number) {
 }
 
 async function main() {
+  if (SOLO_CATALOGO && (await prisma.zona.count()) > 0) {
+    console.log("El catálogo ya está cargado; no se toca nada.");
+    return;
+  }
+
   const oriente = await prisma.zona.upsert({
     where: { nombre: ZONA_ORIENTE.nombre },
     update: ZONA_ORIENTE,
@@ -134,6 +148,59 @@ async function main() {
     );
   }
 
+  // Los cortes de ejemplo son relleno para que las pantallas no se vean vacías la primera
+  // vez; el catálogo es lo que la aplicación necesita de verdad.
+  if (!SOLO_CATALOGO) {
+    await sembrarCortesDeEjemplo(tiendas, zonasComparacion, categorias);
+  }
+
+  const umbrales = await prisma.umbral.count();
+  if (umbrales === 0) await sembrarUmbrales();
+  await sembrarBenchmarks();
+
+  // La marca solo se rellena si aún no está definida: lo que el usuario edite manda.
+  const perfilExistente = await prisma.perfil.findUnique({ where: { id: "maestro" } });
+
+  await prisma.perfil.upsert({
+    where: { id: "maestro" },
+    update: {
+      zonaPropiaId: oriente.id,
+      ...(perfilExistente?.marca ? {} : { marca: "JG Operaciones" }),
+      ...(perfilExistente?.iniciales ? {} : { iniciales: "JG" }),
+    },
+    create: {
+      id: "maestro",
+      nombre: "José García",
+      cargo: "Director de Operaciones",
+      marca: "JG Operaciones",
+      iniciales: "JG",
+      zonaPropiaId: oriente.id,
+      contexto:
+        "Gestiono las 6 tiendas de Zona Oriente de Rio Supermarket y las comparo contra la " +
+        "cadena nacional. Mantengo el Tablero de Control de Ventas y el Reporte de Ajustes por " +
+        "Tipología corte a corte, detecto inconsistencias en la data fuente y convierto los " +
+        "números en presentaciones de tienda, informes ejecutivos y planes de acción.",
+      instruccionesCerebro:
+        "Analiza con criterio de director de operaciones retail: crítico, preciso y orientado a " +
+        "ejecución en tienda. Usa benchmarks internacionales de supermercado (NRF/IGD), prioriza " +
+        "por $ de oportunidad, separa causa raíz de síntoma y di explícitamente qué no se puede " +
+        "concluir con los datos disponibles.",
+    },
+  });
+
+  console.log(
+    `Seed listo: Zona Oriente con ${tiendas.length} tiendas, ${zonasComparacion.length} zonas de ` +
+      `comparación y ${categorias.length} categorías` +
+      (SOLO_CATALOGO ? " (sin cortes de ejemplo)." : `, más ${CORTES.length} cortes de ejemplo.`),
+  );
+}
+
+/** Cortes inventados para que el tablero tenga algo que mostrar antes de la primera carga. */
+async function sembrarCortesDeEjemplo(
+  tiendas: { id: string; codigo: string | null }[],
+  zonasComparacion: { id: string }[],
+  categorias: { id: string; nombre: string }[],
+) {
   for (const definicion of CORTES) {
     const { factor, ...datos } = definicion;
     const corte = await prisma.corte.upsert({
@@ -261,45 +328,6 @@ async function main() {
       });
     }
   }
-
-  const umbrales = await prisma.umbral.count();
-  if (umbrales === 0) await sembrarUmbrales();
-  await sembrarBenchmarks();
-
-  // La marca solo se rellena si aún no está definida: lo que el usuario edite manda.
-  const perfilExistente = await prisma.perfil.findUnique({ where: { id: "maestro" } });
-
-  await prisma.perfil.upsert({
-    where: { id: "maestro" },
-    update: {
-      zonaPropiaId: oriente.id,
-      ...(perfilExistente?.marca ? {} : { marca: "JG Operaciones" }),
-      ...(perfilExistente?.iniciales ? {} : { iniciales: "JG" }),
-    },
-    create: {
-      id: "maestro",
-      nombre: "José García",
-      cargo: "Director de Operaciones",
-      marca: "JG Operaciones",
-      iniciales: "JG",
-      zonaPropiaId: oriente.id,
-      contexto:
-        "Gestiono las 6 tiendas de Zona Oriente de Rio Supermarket y las comparo contra la " +
-        "cadena nacional. Mantengo el Tablero de Control de Ventas y el Reporte de Ajustes por " +
-        "Tipología corte a corte, detecto inconsistencias en la data fuente y convierto los " +
-        "números en presentaciones de tienda, informes ejecutivos y planes de acción.",
-      instruccionesCerebro:
-        "Analiza con criterio de director de operaciones retail: crítico, preciso y orientado a " +
-        "ejecución en tienda. Usa benchmarks internacionales de supermercado (NRF/IGD), prioriza " +
-        "por $ de oportunidad, separa causa raíz de síntoma y di explícitamente qué no se puede " +
-        "concluir con los datos disponibles.",
-    },
-  });
-
-  console.log(
-    `Seed listo: Zona Oriente con ${tiendas.length} tiendas, ${zonasComparacion.length} zonas de ` +
-      `comparación, ${categorias.length} categorías y ${CORTES.length} cortes.`,
-  );
 }
 
 async function sembrarUmbrales() {

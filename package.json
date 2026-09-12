@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "vercel-build": "prisma migrate deploy && next build",
+    "vercel-build": "prisma migrate deploy && tsx prisma/seed.ts --solo-catalogo && next build",
     "postinstall": "prisma generate && (next telemetry disable || true)",
     "db:seed": "prisma db seed",
+    "db:catalogo": "tsx prisma/seed.ts --solo-catalogo",
     "db:reset": "prisma migrate reset --force",
     "auth:hash": "tsx scripts/hash-contrasena.ts"
   },
