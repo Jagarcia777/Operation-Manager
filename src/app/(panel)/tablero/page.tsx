@@ -1,10 +1,15 @@
+import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
 import { Pestanas } from "@/components/Pestanas";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TablaZonas, type ColumnaTabla } from "@/components/TablaZonas";
+import { TablaEvolucion } from "@/components/TablaEvolucion";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
+import { Medidor } from "@/components/graficos/Medidor";
 import { aporte, proyectarCierre, type FilaCalculada, type FilaTienda } from "@/lib/calculos";
-import { cargarTablero, listarCortes, resolverCorte } from "@/lib/consultas";
+import { comparativaMensual, cargarTablero, listarCortes, resolverCorte } from "@/lib/consultas";
+import { prisma } from "@/lib/db";
+import { asp } from "@/lib/documentos/indicadores";
 import { ETIQUETA_ESTADO_CORTE, type EstadoCorte } from "@/lib/dominio";
 import {
   CLASES_TONO,
@@ -17,9 +22,19 @@ import {
 
 const VISTAS = [
   { clave: "resumen", etiqueta: "Resumen" },
+  { clave: "evolucion", etiqueta: "Evolución mensual" },
   { clave: "proyeccion", etiqueta: "Proyección de cierre" },
   { clave: "aportes", etiqueta: "Consolidado de aportes" },
 ] as const;
+
+const INDICADORES_EVOLUCION = [
+  { clave: "ventas", etiqueta: "Venta" },
+  { clave: "ticket", etiqueta: "Ticket promedio" },
+  { clave: "margen", etiqueta: "Margen bruto" },
+  { clave: "logro", etiqueta: "Logro contra meta" },
+] as const;
+
+type IndicadorEvolucion = (typeof INDICADORES_EVOLUCION)[number]["clave"];
 
 function Cumplimiento({ valor }: { valor: number | null }) {
   if (valor === null) return <span className="text-texto-3">—</span>;
@@ -41,8 +56,32 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
     );
   }
 
-  const tablero = await cargarTablero(corte.id);
+  const indicadorPedido =
+    typeof parametros.indicador === "string" ? parametros.indicador : "ventas";
+  const indicador = (INDICADORES_EVOLUCION.some((opcion) => opcion.clave === indicadorPedido)
+    ? indicadorPedido
+    : "ventas") as IndicadorEvolucion;
+
+  const [tablero, benchmarks, comparativa] = await Promise.all([
+    cargarTablero(corte.id),
+    prisma.benchmark.findMany(),
+    vista === "evolucion" ? comparativaMensual(6) : Promise.resolve(null),
+  ]);
   const { total } = tablero;
+
+  // La zona propia es la que se gestiona; el total de cadena es escala, no desempeño.
+  const zonaPropia = tablero.zonas.find((zona) => zona.detallada) ?? null;
+  const referencia = (clave: string) =>
+    benchmarks.find((benchmark) => benchmark.clave === clave)?.valor ?? null;
+
+  const medidores = zonaPropia
+    ? [
+        { etiqueta: "Margen bruto", valor: zonaPropia.subtotal.margenBrutoReal, referencia: referencia("MB_PCT"), sufijo: " %", maximo: 35 },
+        { etiqueta: "Ticket promedio", valor: zonaPropia.subtotal.ticketPromedio, referencia: referencia("RPT"), sufijo: "", maximo: 60 },
+        { etiqueta: "Unidades por ticket", valor: zonaPropia.subtotal.upt, referencia: referencia("UPT"), sufijo: "", maximo: 5 },
+        { etiqueta: "Precio medio", valor: asp(zonaPropia.subtotal), referencia: referencia("ASP"), sufijo: "", maximo: 25 },
+      ].filter((medidor) => medidor.referencia !== null)
+    : [];
 
   const columnas = construirColumnas(vista, total, corte);
 
@@ -84,6 +123,29 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
         />
       </section>
 
+      {medidores.length > 0 && zonaPropia && (
+        <section className="tarjeta p-4">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">{zonaPropia.zona} contra la referencia</h2>
+            <span className="text-xs text-texto-3">
+              La marca del arco es el benchmark cargado en Configuración
+            </span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {medidores.map((medidor) => (
+              <Medidor
+                key={medidor.etiqueta}
+                valor={medidor.valor}
+                referencia={medidor.referencia}
+                maximo={medidor.maximo}
+                sufijo={medidor.sufijo}
+                etiqueta={medidor.etiqueta}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <Pestanas
         pestanas={VISTAS.map((opcion) => ({
           href: `/tablero?corte=${corte.id}&vista=${opcion.clave}`,
@@ -92,14 +154,52 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
         }))}
       />
 
-      <TablaZonas
-        zonas={tablero.zonas.map((zona) => ({
-          ...zona,
-          nota: zona.detallada ? undefined : "solo total de zona",
-        }))}
-        total={total}
-        columnas={columnas}
-      />
+      {vista === "evolucion" ? (
+        comparativa && comparativa.tiendas.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <nav className="no-imprimir flex flex-wrap gap-1.5">
+                {INDICADORES_EVOLUCION.map((opcion) => (
+                  <Link
+                    key={opcion.clave}
+                    href={`/tablero?corte=${corte.id}&vista=evolucion&indicador=${opcion.clave}`}
+                    className={`chip ${
+                      indicador === opcion.clave
+                        ? "bg-acento-tenue text-acento"
+                        : "bg-superficie-3 text-texto-2"
+                    }`}
+                  >
+                    {opcion.etiqueta}
+                  </Link>
+                ))}
+              </nav>
+              <span className="text-xs text-texto-3">
+                Últimos {comparativa.etiquetas.length} cierres de mes · la variación compara
+                contra el primer mes con datos de cada tienda
+              </span>
+            </div>
+
+            <TablaEvolucion comparativa={comparativa} indicador={indicador} />
+
+            <p className="text-xs text-texto-3">
+              Solo entran cierres de mes. Un acumulado de mitad de mes en esta tabla mediría
+              días y no desempeño, y una tienda que abrió a mitad del período va con guion en
+              los meses en que todavía no operaba: un cero diría que no vendió nada.
+            </p>
+          </div>
+        ) : (
+          <EstadoVacio mensaje="Hacen falta al menos dos cierres de mes cargados para comparar la evolución." />
+        )
+      ) : (
+        <TablaZonas
+          zonas={tablero.zonas.map((zona) => ({
+            ...zona,
+            nota: zona.detallada ? undefined : "solo total de zona",
+          }))}
+          total={total}
+          columnas={columnas}
+        />
+      )}
     </div>
   );
 }

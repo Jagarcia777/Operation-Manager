@@ -182,10 +182,10 @@ La cadena está en crecimiento, así que nada del dominio vive fijo en el códig
 | Idea | Por qué aportaría |
 | --- | --- |
 | Registrar el resultado de cada plan de acción | Cierra el ciclo: permite saber qué acciones movieron de verdad el número y que el cerebro recomiende sobre lo que funcionó en esta cadena, no sobre teoría |
-| Catálogo de acciones (playbook) por tipo de problema | Evita reescribir el mismo plan cada mes y estandariza la ejecución en las 24 tiendas |
+| Catálogo de acciones (playbook) por tipo de problema | Evita reescribir el mismo plan cada mes y estandariza la ejecución en las tiendas de la zona |
 | Vista de ventas comparables | Separa el crecimiento real del crecimiento por aperturas |
 | Productividad por m² y por hora-hombre | Dos indicadores clásicos que hoy faltan y que explican buena parte de la brecha entre tiendas |
-| Pantalla de inicio por excepción | Gestión por excepción: ver primero lo que se salió de rango, no las 24 tiendas en orden |
+| Pantalla de inicio por excepción | Gestión por excepción: ver primero lo que se salió de rango, no todas las tiendas en orden |
 
 ## 5. Seguridad y privacidad
 

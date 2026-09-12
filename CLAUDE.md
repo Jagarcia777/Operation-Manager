@@ -34,7 +34,7 @@ npx prisma studio       # inspeccionar la base de datos
 
 ```
 prisma/schema.prisma      modelo de datos (dominio en español)
-prisma/seed.ts            zonas, 24 tiendas y corte de ejemplo
+prisma/seed.ts            catálogo de la zona y cortes de ejemplo
 src/app/                  rutas App Router (una carpeta por módulo)
 src/app/api/              route handlers (extracción IA, exportaciones)
 src/lib/db.ts             singleton de PrismaClient
@@ -45,7 +45,7 @@ src/lib/extraccion/       ingesta con IA de PDF/imagen
 src/lib/documentos/       generación de PPTX/DOCX
 src/components/           componentes compartidos de UI
 src/components/graficos/  gráficos en SVG propio (sin librerías: no se cargan terceros)
-src/lib/demo.ts           generador de la cadena de demostración
+src/lib/demo.ts           generador de la cadena de demostración (un año de historia)
 ```
 
 ## Convenciones

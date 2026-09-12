@@ -9,7 +9,7 @@ si algo queda a medias.
 - [x] Dependencias: Prisma, Anthropic SDK, pptxgenjs, docx
 - [x] Documentos de contexto (`CLAUDE.md`, `docs/ESPECIFICACION.md`, este roadmap)
 - [x] Hook de inicio de sesión y permisos en `.claude/`
-- [x] Esquema Prisma + migraciones + seed (4 zonas, 24 tiendas, 2 cortes, umbrales, perfil)
+- [x] Esquema Prisma + migraciones + seed (zonas, tiendas, cortes, umbrales, perfil)
 
 ## Fase 1 — Datos y cálculos
 
@@ -86,6 +86,13 @@ si algo queda a medias.
 - [x] Cerrar sesión visible también en móvil
 - [x] Siluetas de carga para que el cambio de pestaña sea inmediato
 - [x] Paleta y botones alineados a los valores de Apple
+
+## Fase 10 — Comparación en el tiempo
+
+- [x] Evolución mensual por tienda: tabla comparativa con minigráfica y variación
+- [x] Medidores de la zona contra los benchmarks cargados
+- [x] Análisis precargado en el demo, derivado de sus propias cifras
+- [x] Manual de usuario con la especificación del Dashboard Ejecutivo y prompt para agentes
 
 ## Pendiente del lado del usuario
 

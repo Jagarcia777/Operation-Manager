@@ -160,3 +160,81 @@ function etiquetaCorta(nombre: string): string {
   const anio = partes[1]?.slice(-2) ?? "";
   return anio ? `${mes} ${anio}` : mes;
 }
+
+export type SerieTienda = {
+  tiendaId: string;
+  tienda: string;
+  /** Un valor por corte, en el mismo orden que `etiquetas`. Null donde la tienda no operaba. */
+  ventas: (number | null)[];
+  ticket: (number | null)[];
+  margen: (number | null)[];
+  logro: (number | null)[];
+};
+
+export type ComparativaMensual = {
+  etiquetas: string[];
+  tiendas: SerieTienda[];
+};
+
+/**
+ * Evolución mes a mes de cada tienda de la zona propia. Es lo que el gráfico de la zona no
+ * puede contestar: si la zona sube porque suben todas o porque una tapa a otra.
+ *
+ * Solo cierres de mes y en el mismo orden para todas, de modo que las columnas de la tabla y
+ * los puntos del gráfico signifiquen lo mismo en cada fila. Una tienda que todavía no había
+ * abierto va con null y no con cero: cero diría que vendió nada, y no es lo mismo.
+ */
+export async function comparativaMensual(limite = 6): Promise<ComparativaMensual> {
+  const cortes = await prisma.corte.findMany({
+    where: { tipo: "CIERRE_MES" },
+    orderBy: { fechaFin: "desc" },
+    take: limite,
+  });
+  if (!cortes.length) return { etiquetas: [], tiendas: [] };
+
+  const ordenados = cortes.slice().reverse();
+  const [perfil, registros] = await Promise.all([
+    prisma.perfil.findUnique({ where: { id: "maestro" } }),
+    prisma.registroVentas.findMany({
+      where: { corteId: { in: ordenados.map((corte) => corte.id) } },
+      include: { tienda: { select: { id: true, nombre: true, zonaId: true, orden: true } } },
+    }),
+  ]);
+
+  const zonaPropia = perfil?.zonaPropiaId ?? null;
+  const propios = zonaPropia
+    ? registros.filter((registro) => registro.tienda.zonaId === zonaPropia)
+    : registros;
+
+  const catalogo = new Map<string, { nombre: string; orden: number }>();
+  for (const registro of propios) {
+    catalogo.set(registro.tienda.id, {
+      nombre: registro.tienda.nombre,
+      orden: registro.tienda.orden,
+    });
+  }
+
+  const porClave = new Map(propios.map((r) => [`${r.corteId}:${r.tiendaId}`, r]));
+
+  const tiendas = [...catalogo.entries()]
+    .sort((a, b) => a[1].orden - b[1].orden)
+    .map(([tiendaId, datos]) => {
+      const filas = ordenados.map((corte) => porClave.get(`${corte.id}:${tiendaId}`) ?? null);
+      return {
+        tiendaId,
+        tienda: datos.nombre,
+        ventas: filas.map((fila) => fila?.ventasReal ?? null),
+        ticket: filas.map((fila) =>
+          fila?.ventasReal && fila.transaccionesReal
+            ? fila.ventasReal / fila.transaccionesReal
+            : null,
+        ),
+        margen: filas.map((fila) => fila?.margenBrutoReal ?? null),
+        logro: filas.map((fila) =>
+          fila?.ventasReal && fila.ventasMeta ? (fila.ventasReal / fila.ventasMeta) * 100 : null,
+        ),
+      };
+    });
+
+  return { etiquetas: ordenados.map((corte) => etiquetaCorta(corte.nombre)), tiendas };
+}
