@@ -26,6 +26,12 @@ const cabecerasSeguridad = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Los formularios aceptan 1 MB por defecto, y un Dashboard Ejecutivo en PDF o una foto
+    // del tablero pasan de eso con facilidad. Se sube al máximo que admite la plataforma
+    // serverless (4,5 MB de petición), dejando margen para el resto del formulario.
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: cabecerasSeguridad }];
   },

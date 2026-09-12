@@ -2,19 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { TAMANO_MAXIMO, TIPOS_ACEPTADOS } from "@/lib/carga";
 import { prisma } from "@/lib/db";
 import { TIPOLOGIAS, type Tipologia } from "@/lib/dominio";
-import { MODELO, extraerAjustes, extraerVentas } from "@/lib/extraccion/extraer";
+import { MODELO, explicarFalloIA, extraerAjustes, extraerVentas } from "@/lib/extraccion/extraer";
 import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
 
-const TIPOS_ACEPTADOS: Record<string, string> = {
-  "application/pdf": "pdf",
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
 
-const TAMANO_MAXIMO = 20 * 1024 * 1024;
 
 export async function subirYExtraer(formData: FormData) {
   const corteId = String(formData.get("corteId") ?? "");
@@ -28,7 +22,7 @@ export async function subirYExtraer(formData: FormData) {
     throw new Error("Solo se aceptan PDF, PNG, JPG o WEBP.");
   }
   if (archivo.size > TAMANO_MAXIMO) {
-    throw new Error("El archivo supera los 20 MB.");
+    throw new Error("El archivo supera los 4 MB.");
   }
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
@@ -59,7 +53,7 @@ export async function subirYExtraer(formData: FormData) {
       where: { id: extraccion.id },
       data: {
         estado: "ERROR",
-        error: error instanceof Error ? error.message : "Error desconocido al leer el archivo.",
+        error: explicarFalloIA(error),
       },
     });
   }

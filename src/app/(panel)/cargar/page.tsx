@@ -5,6 +5,8 @@ import { listarCortes } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { hayClaveIA } from "@/lib/extraccion/extraer";
 import { fechaCorta } from "@/lib/formato";
+import { CampoArchivo } from "@/components/CampoArchivo";
+import { ACEPTA, TAMANO_MAXIMO } from "@/lib/carga";
 import { borrarExtraccion, subirYExtraer } from "./acciones";
 
 const ESTADO_TEXTO: Record<string, string> = {
@@ -82,16 +84,11 @@ export default async function CargarPage() {
             </label>
           </div>
 
-          <label className="block text-sm">
-            <span className="text-texto-2">Archivo (PDF, PNG, JPG o WEBP, hasta 20 MB)</span>
-            <input
-              type="file"
-              name="archivo"
-              accept="application/pdf,image/png,image/jpeg,image/webp"
-              required
-              className="campo mt-1.5 file:mr-3 file:rounded-md file:border-0 file:bg-superficie-3 file:px-3 file:py-1 file:text-sm"
-            />
-          </label>
+          <CampoArchivo
+            nombre="archivo"
+            acepta={ACEPTA}
+            maximoBytes={TAMANO_MAXIMO}
+          />
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-texto-3">

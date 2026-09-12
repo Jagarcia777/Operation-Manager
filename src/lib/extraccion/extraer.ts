@@ -75,6 +75,31 @@ async function pedirExtraccion<T>(
   return respuesta.parsed_output as T;
 }
 
+/**
+ * Traduce los fallos de la API a algo accionable. El error crudo llega en inglés y con JSON
+ * dentro, y en esta pantalla lo único que necesita saber una persona es qué tiene que arreglar.
+ */
+export function explicarFalloIA(error: unknown): string {
+  const crudo = error instanceof Error ? error.message : String(error);
+
+  if (/authentication_error|invalid x-api-key|API key is invalid|\b401\b/i.test(crudo)) {
+    return "La clave de Anthropic no es válida. Revísala en las variables de entorno y vuelve a desplegar.";
+  }
+  if (/credit balance|insufficient|quota/i.test(crudo)) {
+    return "La cuenta de Anthropic no tiene saldo. Recárgala y vuelve a intentarlo.";
+  }
+  if (/rate_limit|\b429\b/i.test(crudo)) {
+    return "Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo.";
+  }
+  if (/overloaded|\b529\b|\b503\b/i.test(crudo)) {
+    return "El servicio está saturado en este momento. Vuelve a intentarlo en unos minutos.";
+  }
+  if (/timeout|ETIMEDOUT|ECONNRESET|fetch failed/i.test(crudo)) {
+    return "Se cortó la conexión con el servicio. Vuelve a intentarlo; si el documento es muy pesado, sube solo la página del tablero.";
+  }
+  return crudo;
+}
+
 export async function extraerVentas(archivo: ArchivoEntrada): Promise<ExtraccionVentasTipo> {
   return pedirExtraccion<ExtraccionVentasTipo>(
     archivo,
