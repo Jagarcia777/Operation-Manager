@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "vercel-build": "prisma migrate deploy && tsx prisma/seed.ts --solo-catalogo && next build",
+    "vercel-build": "prisma migrate deploy && (tsx prisma/seed.ts --solo-catalogo || echo \"Catálogo no sembrado; la aplicación abrirá con la pantalla de inicio.\") && next build",
     "postinstall": "prisma generate && (next telemetry disable || true)",
     "db:seed": "prisma db seed",
     "db:catalogo": "tsx prisma/seed.ts --solo-catalogo",
