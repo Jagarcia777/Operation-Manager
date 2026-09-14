@@ -82,6 +82,7 @@ model Tienda {
   planes       PlanAccion[]
   notas        NotaMemoria[]
   inspecciones Inspeccion[]
+  plantilla    RegistroPlantilla[]
 
   @@index([zonaId])
 }
@@ -107,6 +108,7 @@ model Corte {
   notas         NotaMemoria[]
   analisis      Analisis[]
   inspecciones  Inspeccion[]
+  plantilla     RegistroPlantilla[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -436,4 +438,70 @@ model ResultadoPunto {
   @@unique([inspeccionId, puntoId])
   @@index([puntoId])
   @@index([estado])
+}
+
+// ─── Eficiencia de la plantilla ──────────────────────────────────────────────
+// Cuánto produce cada hora de trabajo pagada. El KPI depende del área: las de venta directa
+// se miden en ventas por hora, las de reposición en unidades por hora, las de atención en
+// transacciones por hora, y las que no tienen volumen propio (limpieza, seguridad) solo por
+// cobertura de plantilla. El estándar internacional llega como rango, no como punto: guardar
+// solo el punto medio convertiría en desviación lo que es dispersión normal de la industria.
+
+model AreaOperativa {
+  id     String @id @default(cuid())
+  nombre String @unique
+
+  // SPLH | UPLH | TPLH | COBERTURA
+  kpi String
+
+  // Rango de referencia y el punto contra el que se calcula el índice. Dentro del rango el
+  // área cumple; el punto solo sirve para ordenar qué tan lejos está la que se sale.
+  estandarMin Float?
+  estandarMax Float?
+  estandar    Float?
+
+  fuente String?
+  nota   String?
+
+  // Administración se mide contra la venta de toda la tienda, no contra una venta propia.
+  // Su volumen se deriva del resto y no entra en el total: si se capturara, lo duplicaría.
+  usaVentaTienda Boolean @default(false)
+
+  activa Boolean @default(true)
+  orden  Int     @default(0)
+
+  registros RegistroPlantilla[]
+}
+
+// Lo que se captura de un área en un corte. Todo lo demás —productividad, cobertura,
+// índice, semáforo, horas ganadas— se deriva en src/lib/plantilla.ts y no se guarda.
+model RegistroPlantilla {
+  id       String        @id @default(cuid())
+  corteId  String
+  tiendaId String
+  areaId   String
+  corte    Corte         @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda   Tienda        @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  area     AreaOperativa @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  plantillaMeta   Float?
+  plantillaActiva Float?
+
+  horasProgramadas Float?
+  horasTrabajadas  Float?
+  horasAusentismo  Float?
+  horasExtra       Float?
+
+  ventas        Float?
+  unidades      Float?
+  transacciones Float?
+
+  costoNomina Float?
+
+  origen        String   @default("MANUAL")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, tiendaId, areaId])
+  @@index([tiendaId])
+  @@index([areaId])
 }

@@ -15,6 +15,7 @@ const GRUPOS = [
       { href: "/ajustes", etiqueta: "Ajustes", icono: "ajustes" },
       { href: "/alertas", etiqueta: "Alertas", icono: "alertas" },
       { href: "/inspecciones", etiqueta: "Inspecciones", icono: "inspecciones" },
+      { href: "/plantilla", etiqueta: "Eficiencia", icono: "plantilla" },
     ],
   },
   {
@@ -46,6 +47,7 @@ const TRAZOS: Record<string, string> = {
   cargar: "M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v3h13v-3",
   configuracion: "M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2",
   inspecciones: "M6.5 3.5h7a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM8 7.5l1.25 1.25L12 6M8 12.5h4",
+  plantilla: "M7 8.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM3 16v-1.5A3.5 3.5 0 0 1 6.5 11h1A3.5 3.5 0 0 1 11 14.5V16M13 11.5l1.75 1.75L18 10",
 };
 
 function Icono({ nombre }: { nombre: string }) {

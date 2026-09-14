@@ -1,3 +1,4 @@
+import { AREAS_OPERATIVAS } from "@/lib/areas";
 import { TIPOLOGIAS } from "@/lib/dominio";
 import type { PrismaClient } from "@/generated/prisma/client";
 
@@ -360,6 +361,7 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   await sembrarPerfil(prisma, zonaPropia.id);
   await sembrarPlanes(prisma, zonaPropia.id, tiendas, corteActual.id);
   await sembrarNotas(prisma, zonaPropia.id, tiendas);
+  await sembrarPlantilla(prisma, ventas, tiendas);
   await sembrarAlertas(prisma, corteActual.id, corteMedio.id, tiendas);
   await sembrarAnalisis(prisma, corteActual, zonaPropia.id);
   await sembrarChecklists(prisma, tiendas, corteActual.id);
@@ -381,6 +383,206 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
  * TRUNCATE ... CASCADE en una sola ida a la base, en vez de quince deleteMany encadenados por
  * orden de dependencia: más rápido y sin orden que mantener.
  */
+// ─── Eficiencia de la plantilla ─────────────────────────────────────────────
+
+/**
+ * Cuánto le toca a cada área del volumen de la tienda. No es una invención libre: la venta
+ * de perecederos sigue el peso de sus categorías, las unidades de reposición salen de las
+ * unidades vendidas y las transacciones de cajas son todas las de la tienda. Así el módulo
+ * de eficiencia y el tablero cuentan la misma historia y no dos distintas.
+ */
+const REPARTO_AREAS: Record<string, { base: "VENTAS" | "UNIDADES" | "TRANSACCIONES"; parte: number }> = {
+  "Cajas (Front End)": { base: "TRANSACCIONES", parte: 1 },
+  "Piso de Venta — Abarrotes / Secos": { base: "UNIDADES", parte: 0.85 },
+  // Solo una parte de la venta de la categoría pasa por el mostrador atendido: el resto sale
+  // preempacado del anaquel y lo repone el piso de venta. Por eso la parte es menor que el
+  // peso de la categoría en el tablero.
+  "Perecederos — Carnicería": { base: "VENTAS", parte: 0.09 },
+  "Perecederos — Charcutería": { base: "VENTAS", parte: 0.05 },
+  "Panadería y Pastelería": { base: "VENTAS", parte: 0.035 },
+  "Frutas y Hortalizas": { base: "VENTAS", parte: 0.065 },
+  "Lácteos y Refrigerados": { base: "UNIDADES", parte: 0.42 },
+  Congelados: { base: "UNIDADES", parte: 0.2 },
+  // Recepción se mide en bultos, no en unidades sueltas: alrededor de doce por bulto.
+  "Recepción y Almacén": { base: "UNIDADES", parte: 0.14 },
+  "Reposición General / Abastecimiento": { base: "UNIDADES", parte: 0.55 },
+  "Atención al Cliente / Servicio": { base: "TRANSACCIONES", parte: 0.08 },
+};
+
+/**
+ * Dónde duele en cada tienda. Un problema de productividad real se concentra en dos o tres
+ * áreas con nombre y apellido; no se reparte parejo por toda la nómina. Sin esto el demo
+ * enseñaría seis tiendas mediocres y ninguna con un foco claro donde actuar.
+ */
+const FOCOS_DEBILES: Record<string, { areas: string[]; factor: number }> = {
+  SMA: { areas: ["Perecederos — Carnicería", "Reposición General / Abastecimiento"], factor: 0.66 },
+  PNU: { areas: ["Cajas (Front End)", "Recepción y Almacén"], factor: 0.7 },
+  CVE: { areas: ["Panadería y Pastelería"], factor: 0.74 },
+};
+
+/**
+ * Carácter laboral de cada tienda, alineado con el comercial: la insignia y la exprés
+ * rinden por encima del estándar, la del problema de margen viene corta de productividad y
+ * la recién abierta todavía está aprendiendo. `costoObjetivo` es el porcentaje de la venta
+ * que se lleva la nómina, y de ahí sale el costo por hora.
+ */
+const CARACTER_LABORAL: Record<string, { eficiencia: number; cobertura: number; ausentismo: number; costoObjetivo: number }> = {
+  ALT: { eficiencia: 1.04, cobertura: 0.97, ausentismo: 0.035, costoObjetivo: 7.2 },
+  ROB: { eficiencia: 0.98, cobertura: 0.95, ausentismo: 0.042, costoObjetivo: 7.9 },
+  CVE: { eficiencia: 0.96, cobertura: 0.94, ausentismo: 0.046, costoObjetivo: 8.3 },
+  SMA: { eficiencia: 0.87, cobertura: 0.9, ausentismo: 0.062, costoObjetivo: 9.6 },
+  PNU: { eficiencia: 0.85, cobertura: 0.92, ausentismo: 0.051, costoObjetivo: 9.1 },
+  MIR: { eficiencia: 1.07, cobertura: 0.98, ausentismo: 0.028, costoObjetivo: 6.8 },
+};
+
+/** Jornada mensual de una persona a tiempo completo: 44 horas semanales. */
+const HORAS_POR_PERSONA = 190;
+
+async function sembrarPlantilla(
+  prisma: PrismaClient,
+  ventas: {
+    corteId: string;
+    tiendaId: string;
+    ventasReal: number;
+    unidadesReal: number;
+    transaccionesReal: number;
+  }[],
+  tiendas: { perfil: { codigo: string; metrosCuadrados: number }; fila: { id: string } }[],
+) {
+  await sembrarAreas(prisma);
+  const areas = await prisma.areaOperativa.findMany({ orderBy: { orden: "asc" } });
+  const codigoPorTienda = new Map(tiendas.map(({ perfil, fila }) => [fila.id, perfil.codigo]));
+  const metrosPorTienda = new Map(tiendas.map(({ perfil, fila }) => [fila.id, perfil.metrosCuadrados]));
+
+  const registros = [];
+
+  for (const [indice, venta] of ventas.entries()) {
+    const codigo = codigoPorTienda.get(venta.tiendaId) ?? "ALT";
+    const caracter = CARACTER_LABORAL[codigo] ?? CARACTER_LABORAL.ALT;
+    const metros = metrosPorTienda.get(venta.tiendaId) ?? 1800;
+
+    // La productividad mejora despacio a lo largo del año: es lo que se quiere poder ver.
+    const maduracion = 1 + (indice % 14) * 0.0015;
+
+    const filas: {
+      areaId: string;
+      horasTrabajadas: number;
+      plantillaMeta: number;
+      plantillaActiva?: number;
+      volumen: { ventas: number | null; unidades: number | null; transacciones: number | null };
+    }[] = [];
+
+    for (const area of areas) {
+      const semilla = indice * 31 + area.orden * 7;
+      const reparto = REPARTO_AREAS[area.nombre];
+
+      if (!reparto) {
+        // Limpieza, seguridad y administración no se dimensionan por volumen sino por tamaño
+        // de tienda: metros que cubrir, accesos que vigilar y una oficina que sostenerlos.
+        const personas =
+          area.nombre.startsWith("Limpieza")
+            ? Math.max(3, Math.round(metros / 620))
+            : area.nombre.startsWith("Seguridad")
+              ? Math.max(2, Math.round(metros / 900))
+              : Math.max(4, Math.round(metros / 320));
+        // Aquí la cobertura ES el indicador, así que la meta es la dotación que hace falta y
+        // el activo lo que de verdad hay: si ambos salieran del mismo número, la fila diría
+        // 100 % siempre y no mediría nada.
+        const plantillaMeta = Math.max(2, Math.round(personas * variar(semilla + 3, 0.08)));
+        // En un equipo de cuatro o cinco la cobertura no es continua: falta una persona o no
+        // falta. Multiplicar por 0,97 y redondear devolvía siempre la plantilla completa.
+        const faltantes = ruido(semilla + 6) < (1 - caracter.cobertura) * 6 ? 1 : 0;
+        const activa = Math.max(1, plantillaMeta - faltantes);
+        filas.push({
+          areaId: area.id,
+          plantillaMeta,
+          plantillaActiva: activa,
+          horasTrabajadas: Math.round(activa * HORAS_POR_PERSONA),
+          volumen: { ventas: null, unidades: null, transacciones: null },
+        });
+        continue;
+      }
+
+      const bruto =
+        reparto.base === "VENTAS"
+          ? venta.ventasReal
+          : reparto.base === "UNIDADES"
+            ? venta.unidadesReal
+            : venta.transaccionesReal;
+      const volumen = Math.round(bruto * reparto.parte * variar(semilla + 11, 0.06));
+
+      // Las horas salen del estándar y del rendimiento del área: el índice queda controlado
+      // y no es un número suelto que luego no se parece a la operación.
+      const foco = FOCOS_DEBILES[codigo];
+      const castigo = foco?.areas.includes(area.nombre) ? foco.factor : 1;
+      const rendimiento = caracter.eficiencia * maduracion * castigo * variar(semilla + 17, 0.09);
+      const horasTrabajadas = Math.max(
+        8,
+        Math.round(volumen / ((area.estandar ?? 100) * rendimiento)),
+      );
+
+      filas.push({
+        areaId: area.id,
+        plantillaMeta: 0, // se resuelve abajo, a partir del activo
+        horasTrabajadas,
+        volumen: {
+          ventas: area.kpi === "SPLH" ? volumen : null,
+          unidades: area.kpi === "UPLH" ? volumen : null,
+          transacciones: area.kpi === "TPLH" ? volumen : null,
+        },
+      });
+    }
+
+    // El costo por hora se despeja del objetivo de nómina sobre ventas de la tienda: así el
+    // KPI financiero cierra con la operación en vez de ser una cifra puesta a ojo.
+    const horasTotales = filas.reduce((suma, fila) => suma + fila.horasTrabajadas, 0);
+    const costoHora = (venta.ventasReal * (caracter.costoObjetivo / 100)) / (horasTotales || 1);
+
+    for (const [posicion, fila] of filas.entries()) {
+      const semilla = indice * 31 + posicion * 13 + 5;
+      const ausentismo = caracter.ausentismo * variar(semilla, 0.3);
+      const horasAusentismo = Math.round(fila.horasTrabajadas * ausentismo);
+
+      // El activo sale de las horas que se trabajaron y la meta de dividirlo entre la cobertura.
+      // En un área de una sola persona el redondeo da 100 %, que es la verdad: o está o no está.
+      const activa = fila.plantillaActiva ?? Math.max(1, Math.round(fila.horasTrabajadas / HORAS_POR_PERSONA));
+      const meta = fila.plantillaMeta || Math.max(activa, Math.round(activa / caracter.cobertura));
+
+      registros.push({
+        corteId: venta.corteId,
+        tiendaId: venta.tiendaId,
+        areaId: fila.areaId,
+        plantillaMeta: meta,
+        plantillaActiva: activa,
+        // Programadas = trabajadas + ausentismo, que es lo que hace que la captura cuadre.
+        horasProgramadas: fila.horasTrabajadas + horasAusentismo,
+        horasTrabajadas: fila.horasTrabajadas,
+        horasAusentismo,
+        horasExtra: Math.round(fila.horasTrabajadas * 0.025 * variar(semilla + 4, 0.6)),
+        ventas: fila.volumen.ventas,
+        unidades: fila.volumen.unidades,
+        transacciones: fila.volumen.transacciones,
+        costoNomina: Math.round(fila.horasTrabajadas * costoHora),
+        origen: "MANUAL",
+      });
+    }
+  }
+
+  for (let i = 0; i < registros.length; i += 500) {
+    await prisma.registroPlantilla.createMany({ data: registros.slice(i, i + 500) });
+  }
+}
+
+async function sembrarAreas(prisma: PrismaClient) {
+  await prisma.areaOperativa.createMany({
+    data: AREAS_OPERATIVAS.map((area, indice) => ({
+      ...area,
+      usaVentaTienda: area.usaVentaTienda ?? false,
+      orden: indice + 1,
+    })),
+  });
+}
+
 export async function vaciarDatos(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(`
     DO $$
@@ -591,6 +793,33 @@ async function sembrarAlertas(
         porcentaje: incidencia.porcentaje,
         monto: Math.round(((venta ?? 0) * incidencia.porcentaje) / 100),
       },
+    });
+  }
+
+  // Dos errores de captura de plantilla, de los que ocurren de verdad: una hoja donde las
+  // horas trabajadas no cuadran con programadas menos ausentismo, y un volumen cargado en la
+  // escala equivocada. No se corrigen: se dejan para que el motor los encuentre y para que
+  // se vea que la aplicación marca y explica en vez de arreglar por su cuenta.
+  const descuadre = await prisma.registroPlantilla.findFirst({
+    where: { corteId: corteActualId, tiendaId: porCodigo("ROB"), area: { kpi: "TPLH" } },
+    orderBy: { area: { orden: "asc" } },
+  });
+  if (descuadre) {
+    await prisma.registroPlantilla.update({
+      where: { id: descuadre.id },
+      data: { horasTrabajadas: Math.round((descuadre.horasTrabajadas ?? 0) * 0.88) },
+    });
+  }
+
+  const escala = await prisma.registroPlantilla.findFirst({
+    where: { corteId: corteActualId, tiendaId: porCodigo("MIR"), area: { kpi: "UPLH" } },
+    orderBy: { area: { orden: "desc" } },
+  });
+  if (escala) {
+    // Bultos cargados como unidades sueltas: el área queda rindiendo varias veces el estándar.
+    await prisma.registroPlantilla.update({
+      where: { id: escala.id },
+      data: { unidades: Math.round((escala.unidades ?? 0) * 3.4) },
     });
   }
 

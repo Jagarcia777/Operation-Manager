@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { construirAjustes, construirTablero } from "@/lib/calculos";
+import { calcularPlantilla, type AreaDefinicion } from "@/lib/plantilla";
 
 export async function listarCortes() {
   return prisma.corte.findMany({ orderBy: { fechaFin: "desc" } });
@@ -237,4 +238,159 @@ export async function comparativaMensual(limite = 6): Promise<ComparativaMensual
     });
 
   return { etiquetas: ordenados.map((corte) => etiquetaCorta(corte.nombre)), tiendas };
+}
+
+export async function cargarAreas() {
+  return prisma.areaOperativa.findMany({
+    where: { activa: true },
+    orderBy: { orden: "asc" },
+  });
+}
+
+function aDefinicion(area: {
+  id: string;
+  nombre: string;
+  kpi: string;
+  estandar: number | null;
+  estandarMin: number | null;
+  estandarMax: number | null;
+  usaVentaTienda: boolean;
+  orden: number;
+}): AreaDefinicion {
+  return {
+    id: area.id,
+    nombre: area.nombre,
+    kpi: area.kpi as AreaDefinicion["kpi"],
+    estandar: area.estandar,
+    estandarMin: area.estandarMin,
+    estandarMax: area.estandarMax,
+    usaVentaTienda: area.usaVentaTienda,
+    orden: area.orden,
+  };
+}
+
+/**
+ * Eficiencia de la plantilla en un corte. Se consolida por tienda y no de una sola pasada:
+ * la venta que se le presta al área administrativa es la de su propia tienda, y juntar
+ * todas las tiendas antes de calcular le prestaría la de la zona entera.
+ */
+export async function cargarPlantilla(corteId: string, tiendaId?: string) {
+  const [areas, tiendas, registros, ventas] = await Promise.all([
+    cargarAreas(),
+    cargarTiendas(),
+    prisma.registroPlantilla.findMany({
+      where: { corteId, ...(tiendaId ? { tiendaId } : {}) },
+    }),
+    // La venta del corte es el denominador del costo de nómina y la base del área que se mide
+    // contra toda la tienda. Ya está capturada en el tablero: pedirla otra vez sería invitar a
+    // que las dos pantallas dijeran cosas distintas.
+    prisma.registroVentas.findMany({
+      where: { corteId, ...(tiendaId ? { tiendaId } : {}) },
+      select: { tiendaId: true, ventasReal: true },
+    }),
+  ]);
+
+  const ventaPorTienda = new Map(ventas.map((venta) => [venta.tiendaId, venta.ventasReal]));
+
+  const definiciones = areas.map(aDefinicion);
+  const alcanzadas = tiendaId ? tiendas.filter((tienda) => tienda.id === tiendaId) : tiendas;
+
+  const porTienda = alcanzadas
+    .map((tienda) => ({
+      tiendaId: tienda.id,
+      tienda: tienda.nombre,
+      zona: tienda.zona.nombre,
+      resumen: calcularPlantilla(
+        definiciones,
+        registros
+          .filter((registro) => registro.tiendaId === tienda.id)
+          .map((registro) => ({
+            areaId: registro.areaId,
+            plantillaMeta: registro.plantillaMeta,
+            plantillaActiva: registro.plantillaActiva,
+            horasProgramadas: registro.horasProgramadas,
+            horasTrabajadas: registro.horasTrabajadas,
+            horasAusentismo: registro.horasAusentismo,
+            horasExtra: registro.horasExtra,
+            ventas: registro.ventas,
+            unidades: registro.unidades,
+            transacciones: registro.transacciones,
+            costoNomina: registro.costoNomina,
+          })),
+        ventaPorTienda.get(tienda.id) ?? null,
+      ),
+    }))
+    .filter((fila) => fila.resumen.areasConDatos > 0);
+
+  // Agregado del alcance: se suman las capturas por área y se calcula una sola vez, para que
+  // el área que se mide contra la venta de la tienda reciba la venta del conjunto y no la de
+  // una sucursal suelta. Sumar los índices ya calculados daría un promedio sin ponderar.
+  const agregadas = definiciones.map((area) => {
+    const delArea = registros.filter((registro) => registro.areaId === area.id);
+    const total = (
+      campo:
+        | "plantillaMeta"
+        | "plantillaActiva"
+        | "horasProgramadas"
+        | "horasTrabajadas"
+        | "horasAusentismo"
+        | "horasExtra"
+        | "ventas"
+        | "unidades"
+        | "transacciones"
+        | "costoNomina",
+    ) => {
+      const valores = delArea
+        .map((registro) => registro[campo])
+        .filter((valor): valor is number => typeof valor === "number");
+      return valores.length ? valores.reduce((suma, valor) => suma + valor, 0) : null;
+    };
+
+    return {
+      areaId: area.id,
+      plantillaMeta: total("plantillaMeta"),
+      plantillaActiva: total("plantillaActiva"),
+      horasProgramadas: total("horasProgramadas"),
+      horasTrabajadas: total("horasTrabajadas"),
+      horasAusentismo: total("horasAusentismo"),
+      horasExtra: total("horasExtra"),
+      ventas: total("ventas"),
+      unidades: total("unidades"),
+      transacciones: total("transacciones"),
+      costoNomina: total("costoNomina"),
+    };
+  });
+
+  const ventaDelAlcance = alcanzadas
+    .map((tienda) => ventaPorTienda.get(tienda.id))
+    .filter((valor): valor is number => typeof valor === "number")
+    .reduce((suma: number | null, valor) => (suma ?? 0) + valor, null);
+
+  const resumen = calcularPlantilla(definiciones, agregadas, ventaDelAlcance);
+
+  return { areas: definiciones, tiendas: alcanzadas, porTienda, resumen, registros };
+}
+
+/** Índice de eficiencia de cada corte, para ver si la plantilla mejora o se deteriora. */
+export async function evolucionPlantilla(limite = 12) {
+  const cortes = await prisma.corte.findMany({
+    orderBy: { fechaFin: "asc" },
+    take: limite,
+    select: { id: true, nombre: true },
+  });
+
+  const series = [];
+  for (const corte of cortes) {
+    const { resumen } = await cargarPlantilla(corte.id);
+    if (resumen.areasConDatos === 0) continue;
+    series.push({
+      corteId: corte.id,
+      etiqueta: corte.nombre.replace(/^Cierre\s+/i, ""),
+      indice: resumen.indice === null ? null : resumen.indice * 100,
+      cobertura: resumen.cobertura,
+      ausentismo: resumen.ausentismo,
+      costoSobreVentas: resumen.costoSobreVentas,
+    });
+  }
+  return series;
 }

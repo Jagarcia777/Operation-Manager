@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { AREAS_OPERATIVAS } from "../src/lib/areas";
 import { TIPOLOGIAS } from "../src/lib/dominio";
 
 try {
@@ -157,6 +158,7 @@ async function main() {
   const umbrales = await prisma.umbral.count();
   if (umbrales === 0) await sembrarUmbrales();
   await sembrarBenchmarks();
+  await sembrarAreas();
 
   // La marca solo se rellena si aún no está definida: lo que el usuario edite manda.
   const perfilExistente = await prisma.perfil.findUnique({ where: { id: "maestro" } });
@@ -414,6 +416,21 @@ async function sembrarBenchmarks() {
       where: { clave: benchmark.clave },
       update: {},
       create: { ...benchmark, nota: "Cargar el valor de referencia en Configuración." },
+    });
+  }
+}
+
+/**
+ * Áreas de la tienda con su KPI y su rango de referencia. A diferencia de los benchmarks, aquí
+ * el valor sí viene cargado: es la referencia internacional publicada, no una meta del negocio.
+ * El usuario la calibra desde Configuración cuando tenga histórico propio.
+ */
+async function sembrarAreas() {
+  for (const [indice, area] of AREAS_OPERATIVAS.entries()) {
+    await prisma.areaOperativa.upsert({
+      where: { nombre: area.nombre },
+      update: { orden: indice + 1 },
+      create: { ...area, usaVentaTienda: area.usaVentaTienda ?? false, orden: indice + 1 },
     });
   }
 }

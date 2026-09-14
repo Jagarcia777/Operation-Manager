@@ -71,6 +71,8 @@ export const TIPOS_ALERTA = [
   "VALOR_ATIPICO",
   "DATO_FALTANTE",
   "SALTO_IMPOSIBLE",
+  "HORAS_DESCUADRADAS",
+  "ESTANDAR_DESCALIBRADO",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
@@ -79,6 +81,8 @@ export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
   VALOR_ATIPICO: "Valor atípico",
   DATO_FALTANTE: "Dato faltante",
   SALTO_IMPOSIBLE: "Salto imposible entre cortes",
+  HORAS_DESCUADRADAS: "Horas que no cuadran",
+  ESTANDAR_DESCALIBRADO: "Estándar fuera de escala",
 };
 
 export const SEVERIDADES = ["ALTA", "MEDIA", "BAJA"] as const;
@@ -158,4 +162,54 @@ export type EstadoInspeccion = (typeof ESTADOS_INSPECCION)[number];
 export const ETIQUETA_ESTADO_INSPECCION: Record<EstadoInspeccion, string> = {
   ABIERTA: "Abierta",
   CERRADA: "Cerrada",
+};
+
+// ─── Eficiencia de la plantilla ─────────────────────────────────────────────
+// Qué volumen mide la productividad de cada área. Las que no tienen volumen propio
+// (limpieza, seguridad) se evalúan solo por cobertura: no hay venta ni unidades que dividir.
+
+export const KPIS_PLANTILLA = ["SPLH", "UPLH", "TPLH", "COBERTURA"] as const;
+export type KpiPlantilla = (typeof KPIS_PLANTILLA)[number];
+
+export const ETIQUETA_KPI_PLANTILLA: Record<KpiPlantilla, string> = {
+  SPLH: "Ventas por hora",
+  UPLH: "Unidades por hora",
+  TPLH: "Transacciones por hora",
+  COBERTURA: "Cobertura de plantilla",
+};
+
+export const UNIDAD_KPI_PLANTILLA: Record<KpiPlantilla, string> = {
+  SPLH: "$/hora",
+  UPLH: "und/hora",
+  TPLH: "trans/hora",
+  COBERTURA: "% de la meta",
+};
+
+export const DESCRIPCION_KPI_PLANTILLA: Record<KpiPlantilla, string> = {
+  SPLH: "Ventas del área ÷ horas trabajadas",
+  UPLH: "Unidades repuestas o recibidas ÷ horas trabajadas",
+  TPLH: "Transacciones atendidas ÷ horas trabajadas",
+  COBERTURA: "Plantilla activa ÷ plantilla meta",
+};
+
+/**
+ * Lectura del índice de eficiencia. DENTRO_DEL_RANGO existe porque el estándar internacional
+ * es un rango: un área a 13 transacciones/hora con referencia 12–20 cumple, aunque quede por
+ * debajo del punto medio. Tratar eso como desviación fabrica un problema que no existe.
+ */
+export const ESTADOS_EFICIENCIA = [
+  "OPTIMO",
+  "DENTRO_DEL_RANGO",
+  "ACEPTABLE",
+  "BAJO_ESTANDAR",
+  "SIN_DATOS",
+] as const;
+export type EstadoEficiencia = (typeof ESTADOS_EFICIENCIA)[number];
+
+export const ETIQUETA_EFICIENCIA: Record<EstadoEficiencia, string> = {
+  OPTIMO: "Óptimo",
+  DENTRO_DEL_RANGO: "En referencia",
+  ACEPTABLE: "Aceptable",
+  BAJO_ESTANDAR: "Bajo estándar",
+  SIN_DATOS: "Sin datos",
 };

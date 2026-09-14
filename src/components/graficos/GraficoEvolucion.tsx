@@ -10,15 +10,27 @@ export function GraficoEvolucion({
   puntos,
   alto = 240,
   ancho = 720,
+  series = { real: "Venta real", meta: "Meta" },
+  formato = abreviar,
+  desdeCero = true,
 }: {
   puntos: PuntoEvolucion[];
   alto?: number;
   ancho?: number;
+  /** Cómo se llaman las dos líneas. Un índice no se lee igual que una venta. */
+  series?: { real: string; meta: string };
+  formato?: (valor: number) => string;
+  /**
+   * Un índice que se mueve entre 93 % y 106 % queda plano si el eje arranca en cero: ahí la
+   * pregunta no es cuánto vale, sino hacia dónde va. Para dinero sí manda empezar en cero,
+   * que es el que no admite exageración de escala.
+   */
+  desdeCero?: boolean;
 }) {
   if (puntos.length < 2) return null;
 
   const valores = puntos.flatMap((punto) => [punto.meta ?? NaN, punto.real ?? NaN]);
-  const escala = ejeY(valores, alto);
+  const escala = ejeY(valores, alto, { desdeCero });
   const util = ancho - MARGEN.izquierda - MARGEN.derecha;
   const x = (indice: number) =>
     MARGEN.izquierda + (puntos.length === 1 ? util / 2 : (indice / (puntos.length - 1)) * util);
@@ -43,8 +55,20 @@ export function GraficoEvolucion({
     return `M ${x(pares[0].indice)},${base} L ${linea} L ${x(pares[pares.length - 1].indice)},${base} Z`;
   })();
 
-  // Con doce meses no caben doce etiquetas: se muestran una de cada dos y siempre la última.
+  // Con doce meses no caben doce etiquetas: se muestra una de cada dos y siempre la última.
+  // Si la última cae pegada a la anterior se quita esa, porque dos nombres de mes encimados
+  // no se leen ninguno de los dos.
   const saltoEtiqueta = puntos.length > 8 ? 2 : 1;
+  const etiquetasVisibles = (() => {
+    const indices = new Set<number>();
+    for (let i = 0; i < puntos.length; i += saltoEtiqueta) indices.add(i);
+    const ultimo = puntos.length - 1;
+    if (!indices.has(ultimo)) {
+      indices.delete(ultimo - 1);
+      indices.add(ultimo);
+    }
+    return indices;
+  })();
 
   return (
     <div>
@@ -55,7 +79,7 @@ export function GraficoEvolucion({
           role="img"
           aria-label="Evolución de ventas contra meta"
         >
-          <Rejilla marcas={escala.marcas} y={escala.y} ancho={ancho} formato={abreviar} />
+          <Rejilla marcas={escala.marcas} y={escala.y} ancho={ancho} formato={formato} />
 
           {areaReal && <path d={areaReal} fill="var(--acento)" opacity="0.08" />}
 
@@ -90,7 +114,7 @@ export function GraficoEvolucion({
           )}
 
           {puntos.map((punto, indice) =>
-            indice % saltoEtiqueta === 0 || indice === puntos.length - 1 ? (
+            etiquetasVisibles.has(indice) ? (
               <text
                 key={punto.etiqueta}
                 x={x(indice)}
@@ -111,8 +135,8 @@ export function GraficoEvolucion({
       </div>
       <Leyenda
         series={[
-          { etiqueta: "Venta real", color: "var(--acento)" },
-          { etiqueta: "Meta", color: "var(--texto-3)" },
+          { etiqueta: series.real, color: "var(--acento)" },
+          { etiqueta: series.meta, color: "var(--texto-3)" },
         ]}
       />
     </div>

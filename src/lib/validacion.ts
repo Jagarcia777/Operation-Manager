@@ -29,6 +29,8 @@ const UMBRALES_POR_DEFECTO: Record<string, number> = {
   FACTOR_ATIPICO: 3,
   SALTO_MAX_PCT: 40,
   TOLERANCIA_SUBTOTAL: 1,
+  TOLERANCIA_HORAS_PCT: 2,
+  INDICE_MAX: 2,
 };
 
 export async function leerUmbrales(): Promise<Record<string, number>> {
@@ -48,11 +50,12 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
   const umbrales = await leerUmbrales();
   const alertas: AlertaDetectada[] = [];
 
-  const [corte, tiendas, ventas, ajustes] = await Promise.all([
+  const [corte, tiendas, ventas, ajustes, plantilla] = await Promise.all([
     prisma.corte.findUnique({ where: { id: corteId } }),
     prisma.tienda.findMany({ where: { activa: true } }),
     prisma.registroVentas.findMany({ where: { corteId } }),
     prisma.registroAjuste.findMany({ where: { corteId } }),
+    prisma.registroPlantilla.findMany({ where: { corteId }, include: { area: true } }),
   ]);
   if (!corte) return alertas;
 
@@ -195,6 +198,93 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
           });
         }
       }
+    }
+  }
+
+  alertas.push(...revisarPlantilla(plantilla, nombrePorTienda, umbrales));
+
+  return alertas;
+}
+
+type RegistroConArea = {
+  tiendaId: string;
+  horasProgramadas: number | null;
+  horasTrabajadas: number | null;
+  horasAusentismo: number | null;
+  horasExtra: number | null;
+  ventas: number | null;
+  unidades: number | null;
+  transacciones: number | null;
+  plantillaMeta: number | null;
+  plantillaActiva: number | null;
+  area: { nombre: string; kpi: string; estandar: number | null };
+};
+
+/**
+ * Revisa la captura de plantilla. Dos cosas rompen la comparación entre tiendas y por eso se
+ * marcan: horas que no cuadran con su propia aritmética —el denominador de todos los KPI— y un
+ * índice fuera de escala, que casi nunca es un área excepcional sino un estándar mal puesto o
+ * un volumen capturado en la columna equivocada.
+ */
+export function revisarPlantilla(
+  registros: RegistroConArea[],
+  nombrePorTienda: Map<string, string>,
+  umbrales: Record<string, number>,
+): AlertaDetectada[] {
+  const alertas: AlertaDetectada[] = [];
+
+  for (const registro of registros) {
+    const nombre = nombrePorTienda.get(registro.tiendaId) ?? "Tienda";
+    const { horasProgramadas: programadas, horasTrabajadas: trabajadas } = registro;
+    const ausencia = registro.horasAusentismo ?? 0;
+
+    // Programadas − ausentismo debería dar las trabajadas. Las horas extra se cuentan aparte
+    // porque el Excel de origen no dice si van dentro de las programadas o encima de ellas,
+    // y de esa lectura depende un 2 % del denominador de cada KPI.
+    if (
+      typeof programadas === "number" &&
+      typeof trabajadas === "number" &&
+      programadas > 0
+    ) {
+      const esperadas = programadas - ausencia;
+      const desvio = Math.abs(trabajadas - esperadas);
+      if ((desvio / programadas) * 100 > umbrales.TOLERANCIA_HORAS_PCT) {
+        alertas.push({
+          tipo: "HORAS_DESCUADRADAS",
+          severidad: "MEDIA",
+          tiendaId: registro.tiendaId,
+          indicador: registro.area.nombre,
+          valorObservado: trabajadas,
+          valorEsperado: esperadas,
+          mensaje: `${nombre} · ${registro.area.nombre}: ${trabajadas} horas trabajadas frente a ${esperadas} que salen de programadas menos ausentismo. Cuadrar antes de comparar productividad, porque esas horas son el divisor de todos los KPI del área.`,
+        });
+      }
+    }
+
+    const estandar = registro.area.estandar;
+    if (!estandar || !trabajadas) continue;
+
+    const volumen =
+      registro.area.kpi === "SPLH"
+        ? registro.ventas
+        : registro.area.kpi === "UPLH"
+          ? registro.unidades
+          : registro.area.kpi === "TPLH"
+            ? registro.transacciones
+            : null;
+    if (typeof volumen !== "number" || volumen <= 0) continue;
+
+    const indice = volumen / trabajadas / estandar;
+    if (indice > umbrales.INDICE_MAX) {
+      alertas.push({
+        tipo: "ESTANDAR_DESCALIBRADO",
+        severidad: "BAJA",
+        tiendaId: registro.tiendaId,
+        indicador: registro.area.nombre,
+        valorObservado: Number((indice * 100).toFixed(0)),
+        valorEsperado: Number((umbrales.INDICE_MAX * 100).toFixed(0)),
+        mensaje: `${nombre} · ${registro.area.nombre} rinde ${(indice * 100).toFixed(0)} % del estándar. A esa distancia lo probable no es un área excepcional sino un estándar mal calibrado o un volumen capturado en otra columna: revisar antes de tomarlo como referencia.`,
+      });
     }
   }
 
