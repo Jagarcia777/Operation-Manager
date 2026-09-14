@@ -40,32 +40,74 @@ const TIENDAS_ORIENTE = [
   { nombre: "Valle de la Pascua", codigo: "VDLP", alias: "VDLP\nValle de la pascua" },
 ];
 
-// El resto de la cadena entra como total de zona: de esas sucursales solo llega el agregado.
-// Los nombres son provisionales hasta que se carguen los reales desde Configuración.
-const ZONAS_COMPARACION = [
-  { nombre: "Zona 2", gerente: "Por definir", orden: 2, detallada: false },
-  { nombre: "Zona 3", gerente: "Por definir", orden: 3, detallada: false },
-  { nombre: "Zona 4", gerente: "Por definir", orden: 4, detallada: false },
-  { nombre: "Zona 5", gerente: "Por definir", orden: 5, detallada: false },
-  { nombre: "Zona 6", gerente: "Por definir", orden: 6, detallada: false },
+// El resto de la cadena, sucursal por sucursal tal como la nombra el Resumen Ejecutivo. Antes
+// entraba como cinco totales de zona porque solo llegaba el agregado; el informe las trae todas
+// abiertas, así que la comparación se hace contra el detalle real y no contra una estimación.
+// La asignación por zona queda para que el usuario la reparta desde Configuración: el informe
+// no dice a qué zona pertenece cada sucursal y la aplicación no lo adivina.
+const ZONA_RESTO = {
+  nombre: "Resto de la cadena",
+  gerente: "Por asignar",
+  orden: 2,
+  detallada: true,
+};
+
+const TIENDAS_RESTO = [
+  { nombre: "Lomas del Sol", alias: "LOMAS DEL SOL" },
+  { nombre: "La Candelaria", alias: "LA CANDELARIA" },
+  { nombre: "Barquisimeto", alias: "BARQUISIMETO" },
+  { nombre: "Cigarral - El Hatillo", alias: "CIGARRAL-EL HATILLO\nCIGARRAL EL HATILLO" },
+  { nombre: "Guatire", alias: "GUATIRE" },
+  { nombre: "Charallave", alias: "CHARALLAVE" },
+  { nombre: "Playa El Ángel", alias: "PLAYA EL ANGEL" },
+  { nombre: "Guarenas", alias: "GUARENAS" },
+  { nombre: "El Recreo", alias: "EL RECREO" },
+  { nombre: "Los Campitos", alias: "LOS CAMPITOS" },
+  { nombre: "El Paraíso", alias: "EL PARAISO" },
+  { nombre: "31 de Julio", alias: "31 DE JULIO" },
+  { nombre: "Juan Bautista Arismendi", alias: "JUAN BAUTISTA ARISMENDI" },
+  { nombre: "Juan Griego", alias: "JUAN GRIEGO" },
+  { nombre: "Terranova", alias: "TERRANOVA" },
+  { nombre: "Sambil", alias: "SAMBIL" },
+  { nombre: "El Marqués", alias: "EL MARQUES" },
+  { nombre: "Los Palos Grandes", alias: "LOS PALOS GRANDES" },
+  // No es una sucursal: es un canal. Suma al total de la cadena pero no compite con las tiendas.
+  { nombre: "Ventas Corporativas", alias: "VENTAS CORPORATIVAS", comparable: false },
 ];
 
-// Categorías de venta. Solo Carnicería está confirmada desde los reportes; el resto son
-// provisionales y se editan desde Configuración.
+// Categorías de venta tal como las publica el Resumen Ejecutivo de la cadena, en su orden de
+// peso. El alias recoge la grafía exacta del sistema emisor para que la lectura automática las
+// reconozca sin tener que renombrarlas aquí.
 const CATEGORIAS = [
-  "Carnicería",
-  "Charcutería",
-  "Panadería",
-  "Frutas y Verduras",
-  "Lácteos",
-  "Víveres",
-  "Bebidas",
-  "Licores",
-  "Congelados",
-  "Limpieza",
-  "Cuidado Personal",
-  "Bazar",
-  "Mascotas",
+  { nombre: "Cárnicos", alias: "CARNICOS" },
+  { nombre: "Víveres", alias: "VIVERES" },
+  { nombre: "Cesta Básica", alias: "CESTA BASICA" },
+  { nombre: "Productos del Campo", alias: "PRODUCTOS DEL CAMPO" },
+  { nombre: "Charcutería", alias: "CHARCUTERIA" },
+  { nombre: "Licores", alias: "LICORES" },
+  { nombre: "Cuidado Personal", alias: "CUIDADO PERSONAL" },
+  { nombre: "Carnicería", alias: "CARNICERIA" },
+  { nombre: "Refrigerado", alias: "REFRIGERADO" },
+  { nombre: "Bebidas No Alcohólicas", alias: "BEBIDAS NO ALCOHOLICAS" },
+  { nombre: "Accesorios y Mantenimiento del Hogar", alias: "ACCESORIO Y MANTENIMIENTO DEL HOGAR" },
+  { nombre: "Galletas y Meriendas", alias: "GALLETAS Y MERIENDAS" },
+  { nombre: "Frutos Secos", alias: "FRUTO SECOS" },
+  { nombre: "Cuidado de la Ropa", alias: "CUIDADO DE LA ROPA" },
+  { nombre: "Restaurante", alias: "RESTAURANTE" },
+  { nombre: "Congelados", alias: "CONGELADOS" },
+  { nombre: "Panificadora", alias: "PANIFICADORA" },
+  { nombre: "Snacks", alias: "SNACKS" },
+  { nombre: "Impulsivos", alias: "IMPULSIVOS" },
+  { nombre: "RX", alias: "RX" },
+  { nombre: "Productos Infantiles", alias: "PRODUCTOS INFANTILES" },
+  { nombre: "OTC", alias: "OTC" },
+  { nombre: "Mascotas", alias: "MASCOTAS" },
+  { nombre: "Fiesta", alias: "FIESTA" },
+  { nombre: "Electrodomésticos", alias: "ELECTRODOMESTICO" },
+  { nombre: "Cigarrillos", alias: "CIGARRILLOS" },
+  { nombre: "Papelería", alias: "PAPELERIA" },
+  { nombre: "Ferreauto", alias: "FERREAUTO" },
+  { nombre: "Mezcladores", alias: "MEZCLADORES" },
 ];
 
 // Los cortes de la cadena son acumulados al día, no meses cerrados.
@@ -120,12 +162,11 @@ async function main() {
     create: ZONA_ORIENTE,
   });
 
-  const zonasComparacion = [];
-  for (const zona of ZONAS_COMPARACION) {
-    zonasComparacion.push(
-      await prisma.zona.upsert({ where: { nombre: zona.nombre }, update: zona, create: zona }),
-    );
-  }
+  const resto = await prisma.zona.upsert({
+    where: { nombre: ZONA_RESTO.nombre },
+    update: ZONA_RESTO,
+    create: ZONA_RESTO,
+  });
 
   const tiendas = [];
   for (const [indice, tienda] of TIENDAS_ORIENTE.entries()) {
@@ -138,13 +179,21 @@ async function main() {
     );
   }
 
+  for (const [indice, tienda] of TIENDAS_RESTO.entries()) {
+    await prisma.tienda.upsert({
+      where: { nombre: tienda.nombre },
+      update: { ...tienda, zonaId: resto.id, orden: indice + 1 },
+      create: { ...tienda, zonaId: resto.id, orden: indice + 1 },
+    });
+  }
+
   const categorias = [];
-  for (const [indice, nombre] of CATEGORIAS.entries()) {
+  for (const [indice, categoria] of CATEGORIAS.entries()) {
     categorias.push(
       await prisma.categoria.upsert({
-        where: { nombre },
-        update: { orden: indice + 1 },
-        create: { nombre, orden: indice + 1 },
+        where: { nombre: categoria.nombre },
+        update: { orden: indice + 1, alias: categoria.alias ?? null },
+        create: { ...categoria, alias: categoria.alias ?? null, orden: indice + 1 },
       }),
     );
   }
@@ -152,7 +201,7 @@ async function main() {
   // Los cortes de ejemplo son relleno para que las pantallas no se vean vacías la primera
   // vez; el catálogo es lo que la aplicación necesita de verdad.
   if (!SOLO_CATALOGO) {
-    await sembrarCortesDeEjemplo(tiendas, zonasComparacion, categorias);
+    await sembrarCortesDeEjemplo(tiendas, categorias);
   }
 
   const umbrales = await prisma.umbral.count();
@@ -191,7 +240,7 @@ async function main() {
   });
 
   console.log(
-    `Seed listo: Zona Oriente con ${tiendas.length} tiendas, ${zonasComparacion.length} zonas de ` +
+    `Seed listo: Zona Oriente con ${tiendas.length} tiendas, ${TIENDAS_RESTO.length} sucursales de ` +
       `comparación y ${categorias.length} categorías` +
       (SOLO_CATALOGO ? " (sin cortes de ejemplo)." : `, más ${CORTES.length} cortes de ejemplo.`),
   );
@@ -200,7 +249,6 @@ async function main() {
 /** Cortes inventados para que el tablero tenga algo que mostrar antes de la primera carga. */
 async function sembrarCortesDeEjemplo(
   tiendas: { id: string; codigo: string | null }[],
-  zonasComparacion: { id: string }[],
   categorias: { id: string; nombre: string }[],
 ) {
   for (const definicion of CORTES) {
@@ -301,33 +349,6 @@ async function sembrarCortesDeEjemplo(
           },
         });
       }
-    }
-
-    // Resto de la cadena: solo el agregado de cada zona.
-    for (const [i, zona] of zonasComparacion.entries()) {
-      const ventaMensual = 5_000_000 + pseudoAleatorio(i + 101) * 6_000_000;
-      const ventasMeta = Math.round((ventaMensual * factor) / 100) * 100;
-      const logro = 0.9 + pseudoAleatorio(i + 111) * 0.18;
-      const ventasReal = Math.round((ventasMeta * logro) / 100) * 100;
-      const rpt = 26 + pseudoAleatorio(i + 121) * 12;
-      const transaccionesReal = Math.round(ventasReal / rpt);
-
-      await prisma.registroZona.upsert({
-        where: { corteId_zonaId: { corteId: corte.id, zonaId: zona.id } },
-        update: {},
-        create: {
-          corteId: corte.id,
-          zonaId: zona.id,
-          ventasMeta,
-          ventasReal,
-          unidadesMeta: Math.round(transaccionesReal * 2.4),
-          unidadesReal: Math.round(transaccionesReal * 2.3),
-          transaccionesMeta: Math.round(transaccionesReal / logro),
-          transaccionesReal,
-          margenBrutoMeta: 22,
-          margenBrutoReal: Number((16 + pseudoAleatorio(i + 131) * 7).toFixed(2)),
-        },
-      });
     }
   }
 }

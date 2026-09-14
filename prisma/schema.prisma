@@ -75,6 +75,11 @@ model Tienda {
   metrosCuadrados Float?
   fechaApertura   DateTime?
 
+  // "Ventas Corporativas" viaja como una fila más del informe pero no es una sucursal: es un
+  // canal con un ticket cincuenta veces mayor y otro surtido. Suma al total de la cadena y
+  // queda fuera de rankings, dispersión y detección de atípicos, donde solo sería ruido.
+  comparable Boolean @default(true)
+
   ventas       RegistroVentas[]
   ajustes      RegistroAjuste[]
   categorias   RegistroCategoria[]
@@ -109,6 +114,7 @@ model Corte {
   analisis      Analisis[]
   inspecciones  Inspeccion[]
   plantilla     RegistroPlantilla[]
+  productos     RegistroProducto[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -144,11 +150,59 @@ model RegistroVentas {
   margenBrutoMeta   Float? // %MB
   margenBrutoReal   Float?
 
+  // Indicadores que el informe ya trae calculados. No se usan para nada más que compararlos
+  // con los que deriva la aplicación: si el impreso y el derivado no coinciden, hay algo que
+  // entender antes de decidir sobre esa cifra, y eso se levanta como alerta.
+  ticketPromedioInforme Float?
+  precioPromedioInforme Float?
+  unidadesPorTicketInforme Float?
+
   origen        String   @default("MANUAL") // MANUAL | CSV | IA
   actualizadoEn DateTime @updatedAt
 
   @@unique([corteId, tiendaId])
   @@index([tiendaId])
+}
+
+// Venta diaria de toda la cadena. El Resumen Ejecutivo publica dos tablas de siete días —cada
+// día contra el anterior y contra el mismo día de la semana pasada—, pero son dos lecturas de
+// una sola serie: se guarda la serie y los dos comparativos se derivan.
+model VentaDiaria {
+  id     String   @id @default(cuid())
+  fecha  DateTime @unique
+  ventas Float
+
+  origen        String   @default("IA")
+  actualizadoEn DateTime @updatedAt
+}
+
+// Productos del top de rotación que publica el informe. No es un catálogo maestro: son los que
+// el informe destaca, y sirven para ver qué sostiene el volumen y qué entra o sale del top.
+model Producto {
+  id     String @id @default(cuid())
+  nombre String @unique
+  // PERECEDERO | NO_PERECEDERO
+  familia String
+
+  registros RegistroProducto[]
+}
+
+model RegistroProducto {
+  id         String   @id @default(cuid())
+  corteId    String
+  productoId String
+  corte      Corte    @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  unidades Float?
+  // Puesto que ocupaba en el top del informe: entrar o salir del top dice tanto como el número.
+  posicion Int?
+
+  origen        String   @default("IA")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, productoId])
+  @@index([productoId])
 }
 
 model RegistroAjuste {
@@ -172,19 +226,28 @@ model RegistroAjuste {
 // Categorías de venta (Carnicería, Charcutería, …): la dimensión donde se ve de dónde sale el
 // margen y qué está drenando el resultado, más allá del total de la tienda.
 model Categoria {
-  id        String              @id @default(cuid())
-  nombre    String              @unique
-  orden     Int                 @default(0)
+  id     String @id @default(cuid())
+  nombre String @unique
+  orden  Int    @default(0)
+
+  // Cómo la escribe el sistema que emite el informe, uno por línea. Sirve para que la lectura
+  // automática reconozca "FRUTO SECOS" como Frutos Secos sin tener que renombrar la categoría.
+  alias String?
+
   registros RegistroCategoria[]
 }
 
 model RegistroCategoria {
   id          String    @id @default(cuid())
   corteId     String
-  tiendaId    String
+  // Nulo cuando la cifra es de toda la cadena: el Resumen Ejecutivo publica la mezcla de
+  // categorías consolidada, sin abrirla por sucursal. La ingesta reemplaza el juego completo
+  // de filas de cadena en cada carga, que es lo que evita duplicados sin poder apoyarse en el
+  // índice único (en Postgres dos NULL no chocan entre sí).
+  tiendaId    String?
   categoriaId String
   corte       Corte     @relation(fields: [corteId], references: [id], onDelete: Cascade)
-  tienda      Tienda    @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  tienda      Tienda?   @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
   categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
 
   ventasReal      Float?

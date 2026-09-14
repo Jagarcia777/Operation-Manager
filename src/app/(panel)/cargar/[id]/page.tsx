@@ -4,6 +4,8 @@ import { EstadoVacio } from "@/components/EstadoVacio";
 import { cargarTiendas } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { emparejarTienda } from "@/lib/extraccion/emparejar";
+import type { ExtraccionResumenEjecutivoTipo } from "@/lib/extraccion/esquemas";
+import { RevisarResumen } from "./RevisarResumen";
 import { moneda } from "@/lib/formato";
 import { confirmarExtraccion } from "../acciones";
 
@@ -60,7 +62,6 @@ export default async function RevisarExtraccionPage({ params }: PageProps<"/carg
     return <EstadoVacio mensaje="El documento sigue en proceso. Vuelve a intentarlo en un momento." />;
   }
 
-  const lectura = JSON.parse(extraccion.respuestaCruda) as LecturaVentas;
   const tiendas = await cargarTiendas();
   const catalogo = tiendas.map((tienda) => ({
     id: tienda.id,
@@ -68,6 +69,41 @@ export default async function RevisarExtraccionPage({ params }: PageProps<"/carg
     codigo: tienda.codigo,
     alias: tienda.alias,
   }));
+
+  if (extraccion.destino === "RESUMEN") {
+    const resumen = JSON.parse(extraccion.respuestaCruda) as ExtraccionResumenEjecutivoTipo;
+    const categorias = await prisma.categoria.findMany({
+      select: { nombre: true, alias: true },
+      orderBy: { orden: "asc" },
+    });
+
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl">Revisar el Resumen Ejecutivo</h1>
+          <p className="mt-1 max-w-2xl text-sm text-texto-2">
+            {extraccion.archivoNombre}. Antes de guardar, comprueba que cada bloque cuadre con el
+            total que el propio informe imprime: es lo que detecta una fila saltada, que es como
+            falla de verdad la lectura de una tabla larga.
+          </p>
+        </header>
+
+        <RevisarResumen lectura={resumen} catalogo={catalogo} categorias={categorias} />
+
+        <form action={confirmarExtraccion} className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="extraccionId" value={extraccion.id} />
+          <button type="submit" className="boton boton-primario">
+            Guardar el informe
+          </button>
+          <Link href="/cargar" className="boton boton-secundario">
+            Descartar
+          </Link>
+        </form>
+      </div>
+    );
+  }
+
+  const lectura = JSON.parse(extraccion.respuestaCruda) as LecturaVentas;
 
   const esAjustes = extraccion.destino === "AJUSTES";
   const campos = esAjustes ? CAMPOS_AJUSTES : CAMPOS_VENTAS;

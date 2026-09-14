@@ -3,9 +3,11 @@ import { EstadoVacio } from "@/components/EstadoVacio";
 import { Pestanas } from "@/components/Pestanas";
 import { listarCortes } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
+import { ETIQUETA_DESTINO, type DestinoExtraccion } from "@/lib/dominio";
 import { hayClaveIA } from "@/lib/extraccion/extraer";
 import { fechaCorta } from "@/lib/formato";
 import { CampoArchivo } from "@/components/CampoArchivo";
+import { SelectorDestino } from "@/components/SelectorDestino";
 import { ACEPTA, TAMANO_MAXIMO } from "@/lib/carga";
 import { borrarExtraccion, subirYExtraer } from "./acciones";
 
@@ -73,30 +75,10 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
         </div>
       )}
 
-      {cortes.length === 0 ? (
-        <EstadoVacio mensaje="Crea primero un corte en Configuración para poder cargarle datos." />
-      ) : (
-        <form action={subirYExtraer} className="tarjeta space-y-4 p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-texto-2">Corte</span>
-              <select name="corteId" className="campo mt-1.5" required>
-                {cortes.map((corte) => (
-                  <option key={corte.id} value={corte.id}>
-                    {corte.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block text-sm">
-              <span className="text-texto-2">Qué contiene el documento</span>
-              <select name="destino" className="campo mt-1.5">
-                <option value="VENTAS">Tablero de ventas por tienda</option>
-                <option value="AJUSTES">Ajustes por tipología</option>
-              </select>
-            </label>
-          </div>
+      {/* El Resumen Ejecutivo crea sus propios cortes, así que la carga nunca está bloqueada
+          por no tener uno: solo los otros dos documentos necesitan uno ya creado. */}
+      <form action={subirYExtraer} className="tarjeta space-y-4 p-5">
+          <SelectorDestino cortes={cortes.map((corte) => ({ id: corte.id, nombre: corte.nombre }))} />
 
           <CampoArchivo
             nombre="archivo"
@@ -112,8 +94,7 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
               Leer documento
             </button>
           </div>
-        </form>
-      )}
+      </form>
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-texto-2">Cargas recientes</h2>
@@ -130,7 +111,9 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
                   <p className="truncate text-sm font-medium">{extraccion.archivoNombre}</p>
                   <p className="text-xs text-texto-3">
                     {extraccion.corte?.nombre ?? "Sin corte"} ·{" "}
-                    {extraccion.destino === "AJUSTES" ? "Ajustes" : "Ventas"} ·{" "}
+                    {ETIQUETA_DESTINO[extraccion.destino as DestinoExtraccion] ??
+                      extraccion.destino}{" "}
+                    ·{" "}
                     {fechaCorta(extraccion.creadaEn)}
                   </p>
                 </div>

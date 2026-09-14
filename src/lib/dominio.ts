@@ -1,10 +1,12 @@
 // Valores cerrados del dominio. SQLite no soporta enums en Prisma, así que los campos son
 // String y su conjunto válido se declara aquí, junto con la etiqueta que se muestra en la UI.
 
-export const TIPOS_CORTE = ["SEMANAL", "CIERRE_MES"] as const;
+export const TIPOS_CORTE = ["DIARIO", "SEMANAL", "ACUMULADO_MES", "CIERRE_MES"] as const;
 export type TipoCorte = (typeof TIPOS_CORTE)[number];
 export const ETIQUETA_TIPO_CORTE: Record<TipoCorte, string> = {
+  DIARIO: "Día",
   SEMANAL: "Semanal",
+  ACUMULADO_MES: "Acumulado del mes",
   CIERRE_MES: "Cierre de mes",
 };
 
@@ -73,6 +75,7 @@ export const TIPOS_ALERTA = [
   "SALTO_IMPOSIBLE",
   "HORAS_DESCUADRADAS",
   "ESTANDAR_DESCALIBRADO",
+  "INDICADOR_NO_CUADRA",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
@@ -83,6 +86,7 @@ export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
   SALTO_IMPOSIBLE: "Salto imposible entre cortes",
   HORAS_DESCUADRADAS: "Horas que no cuadran",
   ESTANDAR_DESCALIBRADO: "Estándar fuera de escala",
+  INDICADOR_NO_CUADRA: "Indicador impreso no cuadra",
 };
 
 export const SEVERIDADES = ["ALTA", "MEDIA", "BAJA"] as const;
@@ -124,8 +128,13 @@ export const ESTADOS_EXTRACCION = [
 ] as const;
 export type EstadoExtraccion = (typeof ESTADOS_EXTRACCION)[number];
 
-export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES"] as const;
+export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES", "RESUMEN"] as const;
 export type DestinoExtraccion = (typeof DESTINOS_EXTRACCION)[number];
+export const ETIQUETA_DESTINO: Record<DestinoExtraccion, string> = {
+  VENTAS: "Tablero de ventas por tienda",
+  AJUSTES: "Ajustes por tipología",
+  RESUMEN: "Resumen Ejecutivo de la cadena",
+};
 
 // ─── Checklists de operación ────────────────────────────────────────────────
 

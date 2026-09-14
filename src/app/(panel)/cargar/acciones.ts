@@ -2,10 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { TAMANO_MAXIMO, TIPOS_ACEPTADOS } from "@/lib/carga";
+import { TAMANO_MAXIMO, TIPOS_ACEPTADOS, metaDeclarada } from "@/lib/carga";
 import { prisma } from "@/lib/db";
 import { TIPOLOGIAS, type Tipologia } from "@/lib/dominio";
-import { MODELO, explicarFalloIA, extraerAjustes, extraerVentas } from "@/lib/extraccion/extraer";
+import {
+  MODELO,
+  explicarFalloIA,
+  extraerAjustes,
+  extraerResumenEjecutivo,
+  extraerVentas,
+} from "@/lib/extraccion/extraer";
+import type { ExtraccionResumenEjecutivoTipo } from "@/lib/extraccion/esquemas";
+import { guardarResumenEjecutivo } from "@/lib/extraccion/resumen";
 import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
 
 
@@ -15,9 +23,13 @@ export async function subirYExtraer(formData: FormData) {
   const destino = String(formData.get("destino") ?? "VENTAS");
   const archivo = formData.get("archivo");
 
+  // El Resumen Ejecutivo trae su propia fecha y crea sus dos cortes —el día y el acumulado del
+  // mes—, así que es el único documento que no se carga contra un corte ya existente.
+  const creaSuCorte = destino === "RESUMEN";
+
   // Se responde con un mensaje en la pantalla, no con una excepción: un error de servidor
   // llega al navegador como "Application error" y un archivo equivocado no merece eso.
-  if (!corteId || !(archivo instanceof File) || archivo.size === 0) {
+  if ((!corteId && !creaSuCorte) || !(archivo instanceof File) || archivo.size === 0) {
     redirect("/cargar?error=falta");
   }
   if (!TIPOS_ACEPTADOS[archivo.type]) {
@@ -31,7 +43,7 @@ export async function subirYExtraer(formData: FormData) {
 
   const extraccion = await prisma.extraccion.create({
     data: {
-      corteId,
+      corteId: creaSuCorte ? null : corteId,
       destino,
       archivoNombre: archivo.name,
       archivoTipo: archivo.type,
@@ -44,7 +56,11 @@ export async function subirYExtraer(formData: FormData) {
   try {
     const entrada = { datos: buffer.toString("base64"), tipoMime: archivo.type };
     const lectura =
-      destino === "AJUSTES" ? await extraerAjustes(entrada) : await extraerVentas(entrada);
+      destino === "AJUSTES"
+        ? await extraerAjustes(entrada)
+        : destino === "RESUMEN"
+          ? await extraerResumenEjecutivo(entrada)
+          : await extraerVentas(entrada);
 
     await prisma.extraccion.update({
       where: { id: extraccion.id },
@@ -83,7 +99,12 @@ const CAMPO_POR_TIPOLOGIA: Record<Tipologia, string> = {
 export async function confirmarExtraccion(formData: FormData) {
   const extraccionId = String(formData.get("extraccionId") ?? "");
   const extraccion = await prisma.extraccion.findUnique({ where: { id: extraccionId } });
-  if (!extraccion?.corteId) throw new Error("Extracción no encontrada.");
+  if (!extraccion) throw new Error("Extracción no encontrada.");
+
+  if (extraccion.destino === "RESUMEN") {
+    return confirmarResumen(extraccion.id, extraccion.respuestaCruda);
+  }
+  if (!extraccion.corteId) throw new Error("La extracción no tiene corte asociado.");
 
   const corteId = extraccion.corteId;
   const filas = Number(formData.get("filas") ?? 0);
@@ -122,13 +143,13 @@ export async function confirmarExtraccion(formData: FormData) {
     }
 
     const valores = {
-      ventasMeta: aNumero(formData.get(`fila.${indice}.ventasMeta`)),
+      ventasMeta: metaDeclarada(aNumero(formData.get(`fila.${indice}.ventasMeta`))),
       ventasReal: aNumero(formData.get(`fila.${indice}.ventasReal`)),
-      unidadesMeta: aNumero(formData.get(`fila.${indice}.unidadesMeta`)),
+      unidadesMeta: metaDeclarada(aNumero(formData.get(`fila.${indice}.unidadesMeta`))),
       unidadesReal: aNumero(formData.get(`fila.${indice}.unidadesReal`)),
-      transaccionesMeta: aNumero(formData.get(`fila.${indice}.transaccionesMeta`)),
+      transaccionesMeta: metaDeclarada(aNumero(formData.get(`fila.${indice}.transaccionesMeta`))),
       transaccionesReal: aNumero(formData.get(`fila.${indice}.transaccionesReal`)),
-      margenBrutoMeta: aNumero(formData.get(`fila.${indice}.margenBrutoMeta`)),
+      margenBrutoMeta: metaDeclarada(aNumero(formData.get(`fila.${indice}.margenBrutoMeta`))),
       margenBrutoReal: aNumero(formData.get(`fila.${indice}.margenBrutoReal`)),
     };
 
@@ -212,13 +233,13 @@ export async function guardarCapturaManual(formData: FormData) {
 
   for (const tiendaId of tiendaIds) {
     const valores = {
-      ventasMeta: aNumero(formData.get(`${tiendaId}.ventasMeta`)),
+      ventasMeta: metaDeclarada(aNumero(formData.get(`${tiendaId}.ventasMeta`))),
       ventasReal: aNumero(formData.get(`${tiendaId}.ventasReal`)),
-      unidadesMeta: aNumero(formData.get(`${tiendaId}.unidadesMeta`)),
+      unidadesMeta: metaDeclarada(aNumero(formData.get(`${tiendaId}.unidadesMeta`))),
       unidadesReal: aNumero(formData.get(`${tiendaId}.unidadesReal`)),
-      transaccionesMeta: aNumero(formData.get(`${tiendaId}.transaccionesMeta`)),
+      transaccionesMeta: metaDeclarada(aNumero(formData.get(`${tiendaId}.transaccionesMeta`))),
       transaccionesReal: aNumero(formData.get(`${tiendaId}.transaccionesReal`)),
-      margenBrutoMeta: aNumero(formData.get(`${tiendaId}.margenBrutoMeta`)),
+      margenBrutoMeta: metaDeclarada(aNumero(formData.get(`${tiendaId}.margenBrutoMeta`))),
       margenBrutoReal: aNumero(formData.get(`${tiendaId}.margenBrutoReal`)),
     };
 
@@ -243,4 +264,36 @@ export async function borrarExtraccion(formData: FormData) {
   if (!id) return;
   await prisma.extraccion.delete({ where: { id } });
   revalidatePath("/cargar");
+}
+
+/**
+ * Guarda el Resumen Ejecutivo. A diferencia de los otros documentos no se revisa celda por
+ * celda: son veinticinco sucursales por dos bloques, más categorías, productos y la serie
+ * diaria. La comprobación que de verdad protege es otra —cada bloque se contrasta contra el
+ * total que el propio informe imprime, y la pantalla de revisión muestra ese cuadre antes de
+ * confirmar—, porque una fila saltada mueve el total y ninguna revisión a ojo de trescientas
+ * celdas la habría encontrado.
+ */
+async function confirmarResumen(extraccionId: string, respuestaCruda: string | null) {
+  if (!respuestaCruda) throw new Error("La lectura del documento está vacía.");
+  const lectura = JSON.parse(respuestaCruda) as ExtraccionResumenEjecutivoTipo;
+
+  const resultado = await guardarResumenEjecutivo(prisma, lectura);
+
+  if (resultado.alertas.length) {
+    await prisma.alerta.createMany({
+      data: resultado.alertas.map((alerta) => ({ ...alerta, corteId: resultado.corteMesId })),
+    });
+  }
+
+  await prisma.extraccion.update({
+    where: { id: extraccionId },
+    data: { estado: "CONFIRMADO", corteId: resultado.corteMesId },
+  });
+
+  await sincronizarAlertas(resultado.corteDiaId);
+  await sincronizarAlertas(resultado.corteMesId);
+
+  revalidatePath("/", "layout");
+  redirect(`/tablero?corte=${resultado.corteMesId}`);
 }

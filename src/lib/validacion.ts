@@ -61,6 +61,32 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
 
   const nombrePorTienda = new Map(tiendas.map((tienda) => [tienda.id, tienda.nombre]));
   const ventasPorTienda = new Map(ventas.map((registro) => [registro.tiendaId, registro]));
+  // Ventas Corporativas no es una sucursal y no compite con ellas: su ticket es cincuenta veces
+  // el de una tienda y en cualquier prueba de dispersión sería el atípico de todas.
+  const comparables = tiendas.filter((tienda) => tienda.comparable);
+
+  // El informe de la cadena llega con la columna de metas en cero para todas las sucursales:
+  // el sistema emisor no las está cargando. Eso es un solo hallazgo, no veinticinco, y decirlo
+  // una vez evita que la bandeja de alertas quede inservible el día de la primera carga.
+  // Un corte diario no tiene meta porque el documento no la trae para el día: eso no es un
+  // dato faltante sino la forma del informe, y repetirlo cada mañana convertiría la bandeja
+  // en algo que nadie mira.
+  const esperaMeta = corte.tipo !== "DIARIO";
+  const conReal = ventas.filter((registro) => registro.ventasReal !== null);
+  const sinMeta = conReal.filter((registro) => registro.ventasMeta === null);
+  const faltanTodasLasMetas = esperaMeta && conReal.length > 1 && sinMeta.length === conReal.length;
+
+  if (faltanTodasLasMetas) {
+    alertas.push({
+      tipo: "DATO_FALTANTE",
+      severidad: "MEDIA",
+      tiendaId: null,
+      indicador: "ventas",
+      valorObservado: null,
+      valorEsperado: null,
+      mensaje: `Ninguna de las ${conReal.length} sucursales del corte trae meta de ventas. Sin meta no hay cumplimiento ni brecha: el tablero muestra el real y deja el resto en blanco en vez de calcular contra cero.`,
+    });
+  }
 
   // 1. Datos faltantes: una tienda sin cifras deja el subtotal de su zona incompleto.
   for (const tienda of tiendas) {
@@ -77,7 +103,11 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
       });
       continue;
     }
-    if (registro.ventasReal === null || registro.ventasMeta === null) {
+    // Si faltan todas las metas ya se dijo arriba de una vez; repetirlo por tienda es ruido.
+    const falta =
+      registro.ventasReal === null ||
+      (registro.ventasMeta === null && esperaMeta && !faltanTodasLasMetas);
+    if (falta) {
       alertas.push({
         tipo: "DATO_FALTANTE",
         severidad: "MEDIA",
@@ -116,6 +146,7 @@ export async function detectarAlertas(corteId: string): Promise<AlertaDetectada[
     const delTipo = ajustes.filter((ajuste) => ajuste.tipologia === tipologia);
     const porcentajes = delTipo
       .map((ajuste) => {
+        if (!comparables.some((tienda) => tienda.id === ajuste.tiendaId)) return null;
         const venta = ventasPorTienda.get(ajuste.tiendaId)?.ventasReal ?? null;
         if (!venta) return null;
         return { tiendaId: ajuste.tiendaId, valor: (ajuste.monto / venta) * 100 };

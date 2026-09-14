@@ -4,8 +4,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
   ExtraccionAjustes,
+  ExtraccionResumenEjecutivo,
   ExtraccionVentas,
   type ExtraccionAjustesTipo,
+  type ExtraccionResumenEjecutivoTipo,
   type ExtraccionVentasTipo,
 } from "./esquemas";
 
@@ -115,5 +117,39 @@ export async function extraerAjustes(archivo: ArchivoEntrada): Promise<Extraccio
     REGLAS_COMUNES,
     `Este documento es un reporte de ajustes por tipología de una cadena de supermercados. Extrae una fila por sucursal con las cinco tipologías —Merma, Mercancía Dañada, Carga y Descarga, Inventario y Ventas— respetando el signo tal como aparece impreso: los ajustes en contra van en negativo. Las filas de zona y el total de cadena son subtotales, no sucursales. Indica en "unidad" si las cifras son montos en $ o porcentajes sobre ventas.`,
     zodOutputFormat(ExtraccionAjustes),
+  );
+}
+
+/**
+ * Lee el Resumen Ejecutivo de Ventas de la cadena: una sola página con la tabla por sucursal,
+ * el panel de KPI, la mezcla por categoría, los dos top 20 y los comparativos de siete días.
+ *
+ * Las dos instrucciones que más importan son las que evitan datos falsos: que la columna METAS
+ * se transcriba tal como esté impresa —los ceros incluidos, porque distinguir "meta cero" de
+ * "meta no cargada" es decisión de la aplicación y no del lector— y que la fila Total y la de
+ * Ventas Corporativas no se confundan con sucursales.
+ */
+export async function extraerResumenEjecutivo(
+  archivo: ArchivoEntrada,
+): Promise<ExtraccionResumenEjecutivoTipo> {
+  return pedirExtraccion<ExtraccionResumenEjecutivoTipo>(
+    archivo,
+    REGLAS_COMUNES,
+    `Este documento es el "Resumen Ejecutivo de Ventas" de una cadena de supermercados: una sola página con varios cuadros. Extrae todos.
+
+Cuadro de sucursales (arriba a la izquierda): tiene dos bloques por fila. El primero es el día anterior (VTAS, %VTAS, UNID., MB%, TRANS) y el segundo es ACUMULADOS DEL MES (VTAS, METAS, VAR. METAS, UND, TRANS, PP, UNDTKT, TKTPROM). No mezcles los dos bloques: la venta del día y la del mes son columnas distintas con el mismo encabezado.
+- Transcribe METAS tal como esté impresa, incluidos los ceros. No la conviertas en null.
+- %VTAS y VAR. METAS no se extraen: la aplicación los recalcula.
+- La fila "Total" va en totalImpreso, nunca dentro de sucursales.
+- "VENTAS CORPORATIVAS" sí va en sucursales: es una fila del informe y la aplicación ya sabe que no es una tienda.
+
+Paneles "KPI's Dia" y "KPI's Acum." (abajo a la izquierda): las ocho cifras de cada uno, en el orden VTAS, META, Unidades, MB%, TRANS, PP, UNDTKT, TKTPROM.
+
+Cuadro "Ventas por Categoria" (derecha): una fila por categoría con Ventas US$, Unidades y Margen %. Omite la fila Total y la columna % Ventas, que la aplicación recalcula.
+
+Los dos "Top 20 Productos" (centro abajo): producto y unidades, marcando cada uno como PERECEDERO o NO_PERECEDERO según el cuadro del que sale. Omite las filas Total.
+
+Comparativos de 7 días (arriba a la derecha): son dos lecturas de una misma serie de ventas diarias de la cadena. Reconstruye la serie completa en serieDiaria: cada fila da la venta de su fecha y, en la columna de comparación, la venta de la fecha con la que se compara —el día anterior en un cuadro y el mismo día de la semana anterior en el otro—. Incluye también esas fechas comparadas. Si una fecha aparece en varios sitios con el mismo valor, ponla una sola vez; si aparece con valores distintos, ponla una vez y anótalo en observaciones.`,
+    zodOutputFormat(ExtraccionResumenEjecutivo),
   );
 }
