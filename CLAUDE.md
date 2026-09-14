@@ -28,6 +28,8 @@ npx prisma migrate dev  # crear/aplicar migración tras editar el schema
 npx prisma db seed      # cargar zonas, tiendas y datos de ejemplo
 npm run db:demo         # cadena de demostración con un año de historia
 npx prisma studio       # inspeccionar la base de datos
+npm test                # pruebas de los cálculos (node:test vía tsx)
+npm run verificar       # lint + tipos + pruebas + build: correr esto antes de tocar main
 ```
 
 ## Mapa del repo
@@ -39,14 +41,20 @@ src/app/                  rutas App Router (una carpeta por módulo)
 src/app/api/              route handlers (extracción IA, exportaciones)
 src/lib/db.ts             singleton de PrismaClient
 src/lib/calculos.ts       KPIs derivados, subtotales por zona, proyección, aportes
+src/lib/plantilla.ts      eficiencia laboral: horas ganadas, índice por área, cobertura
+src/lib/ritmo.ts          serie diaria de la cadena y sus dos comparativos
+src/lib/areas.ts          las 14 áreas de tienda con su KPI y su rango de referencia
 src/lib/validacion.ts     motor de alertas (nunca corrige, solo marca)
 src/lib/analisis/         cerebro analítico: evidencia determinista + asesoría con IA
 src/lib/extraccion/       ingesta con IA de PDF/imagen
+src/lib/extraccion/resumen.ts    guarda el Resumen Ejecutivo de la cadena (día + acumulado)
+src/lib/extraccion/conciliar.ts  lo impreso contra lo derivado
 src/lib/documentos/       generación de PPTX/DOCX
 src/components/           componentes compartidos de UI
 src/components/graficos/  gráficos en SVG propio (sin librerías: no se cargan terceros)
 src/lib/demo.ts           generador de la cadena de demostración (un año de historia)
 src/app/(panel)/inspecciones/  checklists de operación y seguimiento de correcciones
+src/app/(panel)/plantilla/     índice de eficiencia laboral por área
 ```
 
 ## Convenciones
@@ -67,6 +75,13 @@ src/app/(panel)/inspecciones/  checklists de operación y seguimiento de correcc
   sale No OK exige observación y corrección; un punto marcado `critico` impide cerrar la
   inspección si no la tiene. Al guardar, lo que vuelve a OK pierde su observación y su
   corrección: si no, la hoja seguiría contando hallazgos que ya no existen.
+- **Una meta en cero es una meta que no llegó, no una meta de cero.** El Resumen Ejecutivo de
+  la cadena publica la columna METAS en cero para todas las sucursales: entra como faltante
+  (`metaDeclarada` en `src/lib/carga.ts`), el cumplimiento queda en blanco y el hallazgo se
+  levanta una sola vez para todo el corte, no una por tienda.
+- **Lo que el informe trae ya calculado se guarda pero no se usa para decidir**: se deriva el
+  propio y se comparan. Si difieren de forma pareja en casi todas las sucursales no son
+  veinticinco errores sino una definición distinta, y se dice una vez.
 - **La app nunca corrige datos en silencio.** Toda inconsistencia se registra como `Alerta`
   con su explicación y queda para que una persona confirme o descarte.
 - Todo dato extraído por IA entra como *propuesta*: requiere revisión humana antes de guardarse.
@@ -74,6 +89,10 @@ src/app/(panel)/inspecciones/  checklists de operación y seguimiento de correcc
   `src/lib/calculos.ts`; el modelo recibe esa evidencia ya calculada y aporta diagnóstico,
   estimación y recomendaciones con criterio de director de operaciones retail
   (`docs/ESPECIFICACION.md` §2.8). Nunca se le pide que invente o recalcule números.
+- **Antes de commitear, `npm run verificar`**: lint, tipos, pruebas y build. Cada error de
+  método de este proyecto —margen promediado en vez de ponderado, variación inflada por
+  comparar acumulados de distinta longitud— se encontró mirando la pantalla. Las pruebas
+  fijan esas reglas para que falle el comando y no el informe.
 - **Tras `prisma generate`, reiniciar `npm run dev`**: el servidor mantiene en memoria el cliente
   anterior y falla con columnas que "no existen" aunque la migración ya se haya aplicado.
 - Componentes de servidor por defecto; `"use client"` solo donde haga falta interacción.

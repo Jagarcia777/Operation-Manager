@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { EstadoVacio } from "@/components/EstadoVacio";
 import { Pestanas } from "@/components/Pestanas";
+import { RitmoDiario } from "@/components/RitmoDiario";
 import { SelectorCorte } from "@/components/SelectorCorte";
 import { TablaZonas, type ColumnaTabla } from "@/components/TablaZonas";
 import { TablaEvolucion } from "@/components/TablaEvolucion";
 import { TarjetaKpi } from "@/components/TarjetaKpi";
 import { Medidor } from "@/components/graficos/Medidor";
 import { aporte, proyectarCierre, type FilaCalculada, type FilaTienda } from "@/lib/calculos";
-import { comparativaMensual, cargarTablero, listarCortes, resolverCorte } from "@/lib/consultas";
+import {
+  comparativaMensual,
+  cargarSerieDiaria,
+  cargarTablero,
+  listarCortes,
+  resolverCorte,
+} from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { asp } from "@/lib/documentos/indicadores";
 import { ETIQUETA_ESTADO_CORTE, type EstadoCorte } from "@/lib/dominio";
+import { resumirRitmo } from "@/lib/ritmo";
 import {
   CLASES_TONO,
   fechaCorta,
@@ -22,6 +30,7 @@ import {
 
 const VISTAS = [
   { clave: "resumen", etiqueta: "Resumen" },
+  { clave: "ritmo", etiqueta: "Ritmo diario" },
   { clave: "evolucion", etiqueta: "Evolución mensual" },
   { clave: "proyeccion", etiqueta: "Proyección de cierre" },
   { clave: "aportes", etiqueta: "Consolidado de aportes" },
@@ -62,11 +71,13 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
     ? indicadorPedido
     : "ventas") as IndicadorEvolucion;
 
-  const [tablero, benchmarks, comparativa] = await Promise.all([
+  const [tablero, benchmarks, comparativa, serie] = await Promise.all([
     cargarTablero(corte.id),
     prisma.benchmark.findMany(),
     vista === "evolucion" ? comparativaMensual(6) : Promise.resolve(null),
+    vista === "ritmo" ? cargarSerieDiaria(30) : Promise.resolve([]),
   ]);
+  const ritmo = resumirRitmo(serie);
   const { total } = tablero;
 
   // La zona propia es la que se gestiona; el total de cadena es escala, no desempeño.
@@ -154,7 +165,13 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
         }))}
       />
 
-      {vista === "evolucion" ? (
+      {vista === "ritmo" ? (
+        ritmo.dias.length ? (
+          <RitmoDiario ritmo={ritmo} />
+        ) : (
+          <EstadoVacio mensaje="Todavía no hay serie diaria. La carga el Resumen Ejecutivo de la cadena, que trae los comparativos de siete días." />
+        )
+      ) : vista === "evolucion" ? (
         comparativa && comparativa.tiendas.length > 0 ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

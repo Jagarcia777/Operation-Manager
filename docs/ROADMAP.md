@@ -101,14 +101,34 @@ si algo queda a medias.
 - [x] Seguimiento de correcciones abiertas con responsable, fecha límite y vencidas
 - [x] Cuatro checklists de supermercado cargados en la demostración
 
+## Fase 12 — Eficiencia de la plantilla
+
+- [x] Catorce áreas con su KPI (SPLH, UPLH, TPLH o cobertura) y su rango de referencia
+- [x] Índice agregado por horas ganadas, ponderado por horas y no promediando razones
+- [x] Captura por tienda que solo pide el volumen que mide cada área
+- [x] Alertas de horas descuadradas y de estándar fuera de escala
+- [x] Comparación entre tiendas, evolución del índice y demo con un año de datos
+
+## Fase 13 — El informe real de la cadena
+
+- [x] Las 25 sucursales del Resumen Ejecutivo en el catálogo, con su grafía del sistema emisor
+- [x] Las 29 categorías reales con alias para la lectura automática
+- [x] Un archivo alimenta el corte del día y el del acumulado del mes
+- [x] Meta en cero se lee como meta no cargada, y se dice una vez y no veinticinco
+- [x] Conciliación de PP, UNDTKT y TKTPROM impresos contra los derivados
+- [x] Mezcla por categoría de cadena, top de productos y serie diaria
+- [x] Ritmo diario: semana contra semana, que es lo que el informe no dice
+
 ## Pendiente del lado del usuario
 
 No son tareas de código: la aplicación ya las admite desde Configuración.
 
-- [ ] Nombrar las cinco zonas de comparación (hoy "Zona 2" a "Zona 6")
-- [ ] Revisar las 13 categorías; solo Carnicería salió de los reportes reales
+- [x] ~~Nombrar las cinco zonas de comparación~~ — el informe trae las 25 sucursales abiertas
+- [x] ~~Revisar las categorías~~ — cargadas las 29 del Resumen Ejecutivo
+- [ ] Repartir por zona las 19 sucursales que hoy están en "Resto de la cadena"
 - [ ] Cargar los benchmarks de margen, RPT, UPT, ASP y merma
-- [ ] Cargar el primer corte real
+- [ ] Calibrar el estándar de Administración y Gerencia con histórico propio
+- [ ] Confirmar qué cuenta la columna TRANS: no es la base del TKTPROM impreso
 
 ## Ideas pendientes de aprobación
 

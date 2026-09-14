@@ -394,3 +394,27 @@ export async function evolucionPlantilla(limite = 12) {
   }
   return series;
 }
+
+/** Serie de ventas diarias de la cadena, de la más vieja a la más reciente. */
+export async function cargarSerieDiaria(dias = 30) {
+  const filas = await prisma.ventaDiaria.findMany({
+    orderBy: { fecha: "desc" },
+    take: dias,
+  });
+  return filas
+    .map((fila) => ({ fecha: fila.fecha, ventas: fila.ventas }))
+    .sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+}
+
+/** Top de productos de un corte, separado por familia y ordenado por unidades. */
+export async function cargarProductos(corteId: string) {
+  const filas = await prisma.registroProducto.findMany({
+    where: { corteId },
+    include: { producto: true },
+    orderBy: { unidades: "desc" },
+  });
+  return {
+    perecederos: filas.filter((fila) => fila.producto.familia === "PERECEDERO"),
+    noPerecederos: filas.filter((fila) => fila.producto.familia === "NO_PERECEDERO"),
+  };
+}
