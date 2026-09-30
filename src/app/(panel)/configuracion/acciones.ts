@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { verificarContrasena } from "@/lib/auth-contrasena";
 import { prisma } from "@/lib/db";
+import { sembrarCatalogo } from "@/lib/catalogo";
 import { generarDemo, vaciarDatos } from "@/lib/demo";
 import { ESTADOS_CORTE, TIPOS_CORTE, type EstadoCorte, type TipoCorte } from "@/lib/dominio";
 
@@ -185,6 +186,44 @@ export async function cargarDatosDemo(formData: FormData) {
   await generarDemo(prisma);
   revalidarTodo();
   redirect("/?bienvenida=demo");
+}
+
+/**
+ * Deja la aplicación lista para trabajar con los informes reales: borra todo lo cargado —la
+ * demostración incluida— y pone el catálogo real de la cadena (las 25 sucursales con la grafía
+ * del sistema emisor, las categorías del Resumen Ejecutivo, las áreas de la plantilla, los
+ * umbrales y los benchmarks sin valor). Sin esto, vaciar dejaba la base sin tiendas hasta el
+ * siguiente despliegue.
+ *
+ * De la persona se conserva lo que es suyo —nombre, cargo, marca, iniciales, instrucciones y
+ * preferencias—; el contexto del negocio vuelve al real, porque el de la demostración describe
+ * una cadena inventada.
+ */
+export async function empezarConDatosReales(formData: FormData) {
+  if (!(await claveCorrecta(formData))) {
+    redirect("/configuracion?seccion=datos&error=clave");
+  }
+  const perfil = await prisma.perfil.findUnique({ where: { id: "maestro" } });
+
+  await vaciarDatos(prisma);
+  await sembrarCatalogo(prisma);
+
+  if (perfil) {
+    await prisma.perfil.update({
+      where: { id: "maestro" },
+      data: {
+        nombre: perfil.nombre,
+        cargo: perfil.cargo,
+        marca: perfil.marca,
+        iniciales: perfil.iniciales,
+        instruccionesCerebro: perfil.instruccionesCerebro,
+        preferencias: perfil.preferencias,
+      },
+    });
+  }
+
+  revalidarTodo();
+  redirect("/cargar?bienvenida=real");
 }
 
 export async function vaciarAplicacion(formData: FormData) {

@@ -16,6 +16,7 @@ import {
   agregarNota,
   cargarDatosDemo,
   eliminarChecklist,
+  empezarConDatosReales,
   eliminarPunto,
   guardarChecklist,
   guardarPunto,
@@ -615,6 +616,35 @@ async function SeccionDatos({ error, hecho }: { error: string | null; hecho: str
         </div>
       </div>
 
+      <form action={empezarConDatosReales} className="tarjeta space-y-3 p-5">
+        <h2 className="text-sm font-semibold">Empezar con datos reales</h2>
+        <p className="text-sm text-texto-2">
+          Borra todo lo que haya —la demostración incluida— y deja puesto el catálogo real de la
+          cadena: las 25 sucursales, las categorías del Resumen Ejecutivo y las áreas de la
+          plantilla. Después solo queda subir los informes en Cargar datos. Tu nombre, cargo y
+          marca se conservan.
+        </p>
+        <p className="text-sm text-alerta">
+          Esto elimina los cortes, ajustes, planes e inspecciones cargados y no hay forma de
+          recuperarlos.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block text-sm">
+            <span className="text-texto-2">Tu contraseña de acceso</span>
+            <input
+              name="clave"
+              type="password"
+              className="campo mt-1.5 w-56"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <button type="submit" className="boton boton-primario">
+            Empezar con datos reales
+          </button>
+        </div>
+      </form>
+
       <form action={cargarDatosDemo} className="tarjeta space-y-3 p-5">
         <h2 className="text-sm font-semibold">Cargar datos de demostración</h2>
         <p className="text-sm text-texto-2">
@@ -637,7 +667,7 @@ async function SeccionDatos({ error, hecho }: { error: string | null; hecho: str
               required
             />
           </label>
-          <button type="submit" className="boton boton-primario">
+          <button type="submit" className="boton boton-secundario">
             Cargar demostración
           </button>
         </div>

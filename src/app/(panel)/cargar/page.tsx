@@ -34,6 +34,7 @@ const ESTADO_TONO: Record<string, string> = {
 export default async function CargarPage({ searchParams }: PageProps<"/cargar">) {
   const parametros = await searchParams;
   const error = typeof parametros.error === "string" ? parametros.error : null;
+  const recienEmpezado = parametros.bienvenida === "real";
   const [cortes, extracciones] = await Promise.all([
     listarCortes(),
     prisma.extraccion.findMany({
@@ -62,6 +63,14 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
           { href: "/cargar/manual", etiqueta: "Captura manual", activa: false },
         ]}
       />
+
+      {recienEmpezado && (
+        <p className="tarjeta bg-exito-tenue px-4 py-3 text-sm text-exito">
+          Listo: la aplicación quedó vacía y con el catálogo real de la cadena. Sube el Resumen
+          Ejecutivo del día, los reportes de ventas por categoría de cada tienda y el libro de
+          ajustes; puedes seleccionar varios archivos a la vez.
+        </p>
+      )}
 
       {error && AVISOS[error] && (
         <p className="tarjeta border-alerta-tenue bg-alerta-tenue px-4 py-3 text-sm text-alerta">
