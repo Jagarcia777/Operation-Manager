@@ -11,7 +11,8 @@ import { DESTINOS_EXTRACCION, ETIQUETA_DESTINO, type DestinoExtraccion } from "@
  */
 export function SelectorDestino({ cortes }: { cortes: { id: string; nombre: string }[] }) {
   const [destino, setDestino] = useState<DestinoExtraccion>("RESUMEN");
-  const propioCorte = destino === "RESUMEN" || destino === "CATEGORIAS";
+  const propioCorte =
+    destino === "RESUMEN" || destino === "CATEGORIAS" || destino === "LIBRO_AJUSTES";
 
   return (
     <div className="space-y-4">
@@ -56,6 +57,13 @@ export function SelectorDestino({ cortes }: { cortes: { id: string; nombre: stri
           El reporte de ventas por categoría de cada tienda se lee directo del PDF, sin IA: trae
           su período y su tienda. Puedes subir los de todas las tiendas a la vez; la aplicación
           los reconoce aunque elijas otro tipo de documento.
+        </p>
+      )}
+      {destino === "LIBRO_AJUSTES" && (
+        <p className="text-xs text-texto-3">
+          El libro de Excel «Ajustes de inventario vs ventas» se lee directo, sin IA: el período sale
+          del título. Se toman la venta, las unidades y los dólares a costo; los porcentajes los
+          calcula la aplicación.
         </p>
       )}
     </div>

@@ -7,6 +7,7 @@ const EXTENSIONES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/webp": "webp",
   "text/csv": "csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
 };
 
 /** Devuelve el documento original de una extracción, que es el respaldo de auditoría. */

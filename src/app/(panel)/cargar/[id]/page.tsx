@@ -5,8 +5,10 @@ import { cargarTiendas } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { emparejarTienda } from "@/lib/extraccion/emparejar";
 import type { LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
+import type { LecturaLibroAjustes } from "@/lib/extraccion/libroAjustes";
 import type { ExtraccionResumenEjecutivoTipo } from "@/lib/extraccion/esquemas";
 import { RevisarCategorias } from "./RevisarCategorias";
+import { RevisarLibroAjustes } from "./RevisarLibroAjustes";
 import { RevisarResumen } from "./RevisarResumen";
 import { moneda } from "@/lib/formato";
 import { confirmarExtraccion } from "../acciones";
@@ -75,6 +77,16 @@ export default async function RevisarExtraccionPage({
     codigo: tienda.codigo,
     alias: tienda.alias,
   }));
+
+  if (extraccion.destino === "LIBRO_AJUSTES") {
+    return (
+      <RevisarLibroAjustes
+        extraccionId={extraccion.id}
+        archivoNombre={extraccion.archivoNombre}
+        lectura={JSON.parse(extraccion.respuestaCruda) as LecturaLibroAjustes}
+      />
+    );
+  }
 
   if (extraccion.destino === "CATEGORIAS") {
     return (

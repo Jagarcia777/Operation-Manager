@@ -302,7 +302,7 @@ export async function guardarCategoriasTienda(
  * de tiendas de un producto bajo costo crece a medida que se cargan reportes—. Lo que alguien ya
  * revisó o descartó no se toca ni se vuelve a levantar.
  */
-async function registrarAlertas(
+export async function registrarAlertas(
   prisma: Pick<PrismaClient, "alerta">,
   corteId: string,
   alertas: AlertaDetectada[],

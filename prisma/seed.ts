@@ -89,7 +89,11 @@ const CATEGORIAS = [
   { nombre: "Carnicería", alias: "CARNICERIA" },
   { nombre: "Refrigerado", alias: "REFRIGERADO" },
   { nombre: "Bebidas No Alcohólicas", alias: "BEBIDAS NO ALCOHOLICAS" },
-  { nombre: "Accesorios y Mantenimiento del Hogar", alias: "ACCESORIO Y MANTENIMIENTO DEL HOGAR" },
+  {
+    nombre: "Accesorios y Mantenimiento del Hogar",
+    // El libro de ajustes la abrevia.
+    alias: "ACCESORIO Y MANTENIMIENTO DEL HOGAR\nACCESORIO Y MANT HOGAR",
+  },
   { nombre: "Galletas y Meriendas", alias: "GALLETAS Y MERIENDAS" },
   { nombre: "Frutos Secos", alias: "FRUTO SECOS" },
   { nombre: "Cuidado de la Ropa", alias: "CUIDADO DE LA ROPA" },

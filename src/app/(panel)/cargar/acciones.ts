@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { TAMANO_MAXIMO, TIPOS_ACEPTADOS, metaDeclarada } from "@/lib/carga";
+import { TAMANO_MAXIMO, TIPOS_ACEPTADOS, TIPO_EXCEL, metaDeclarada } from "@/lib/carga";
 import { leerCsvVentas } from "@/lib/csv";
 import { prisma } from "@/lib/db";
 import { TIPOLOGIAS, type Tipologia } from "@/lib/dominio";
@@ -19,9 +19,16 @@ import {
   leerCategoriasTienda,
   type LecturaCategoriasTienda,
 } from "@/lib/extraccion/categoriasTienda";
+import { guardarLibroAjustes } from "@/lib/extraccion/guardarAjustes";
 import { guardarCategoriasTienda } from "@/lib/extraccion/guardarCategorias";
+import {
+  esLibroAjustes,
+  leerLibroAjustes,
+  type LecturaLibroAjustes,
+} from "@/lib/extraccion/libroAjustes";
 import { guardarResumenEjecutivo } from "@/lib/extraccion/resumen";
 import { textoDePdf } from "@/lib/extraccion/textoPdf";
+import { hojasDeExcel } from "@/lib/extraccion/xlsx";
 import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
 
 
@@ -69,6 +76,7 @@ export async function importarCsv(formData: FormData) {
 
 /** Marca de las cargas leídas del texto del PDF, sin IA. */
 const MODELO_LECTOR_PDF = "LECTOR_PDF";
+const MODELO_LECTOR_XLSX = "LECTOR_XLSX";
 
 /**
  * Sube uno o varios documentos. Antes de gastar una lectura con IA se mira si el PDF es un
@@ -123,6 +131,27 @@ async function leerArchivo(archivo: File, destino: string, corteId: string, unic
       });
       return extraccion.id;
     }
+  }
+
+  if (archivo.type === TIPO_EXCEL) {
+    const hojas = await hojasDeExcel(buffer);
+    const conocido = esLibroAjustes(hojas);
+    const extraccion = await prisma.extraccion.create({
+      data: {
+        ...base,
+        destino: "LIBRO_AJUSTES",
+        modelo: MODELO_LECTOR_XLSX,
+        ...(conocido
+          ? { estado: "EXTRAIDO", respuestaCruda: JSON.stringify(leerLibroAjustes(hojas)) }
+          : {
+              estado: "ERROR",
+              error:
+                "Este libro de Excel no tiene el formato de «Ajustes de inventario vs ventas», " +
+                "el único que la aplicación sabe leer. Si trae ventas por tienda, usa Importar CSV.",
+            }),
+      },
+    });
+    return extraccion.id;
   }
 
   // El Resumen Ejecutivo trae su propia fecha y crea sus dos cortes —el día y el acumulado del
@@ -185,7 +214,8 @@ function aNumero(valor: FormDataEntryValue | null): number | null {
   return Number.isFinite(numero) ? numero : null;
 }
 
-const CAMPO_POR_TIPOLOGIA: Record<Tipologia, string> = {
+/** Columnas del reporte de ajustes que lee la IA; las demás tipologías llegan por el libro. */
+const CAMPO_POR_TIPOLOGIA: Partial<Record<Tipologia, string>> = {
   MERMA: "merma",
   MERCANCIA_DANADA: "mercanciaDanada",
   CARGA_DESCARGA: "cargaYDescarga",
@@ -203,6 +233,9 @@ export async function confirmarExtraccion(formData: FormData) {
   }
   if (extraccion.destino === "CATEGORIAS") {
     return confirmarCategorias(extraccion.id, extraccion.respuestaCruda, formData);
+  }
+  if (extraccion.destino === "LIBRO_AJUSTES") {
+    return confirmarLibroAjustes(extraccion.id, extraccion.respuestaCruda);
   }
   if (!extraccion.corteId) throw new Error("La extracción no tiene corte asociado.");
 
@@ -222,7 +255,9 @@ export async function confirmarExtraccion(formData: FormData) {
       )?.ventasReal;
 
       for (const tipologia of TIPOLOGIAS) {
-        const leido = aNumero(formData.get(`fila.${indice}.${CAMPO_POR_TIPOLOGIA[tipologia]}`));
+        const campo = CAMPO_POR_TIPOLOGIA[tipologia];
+        if (!campo) continue;
+        const leido = aNumero(formData.get(`fila.${indice}.${campo}`));
         if (leido === null) continue;
 
         // El documento puede venir en % o en monto; se guarda siempre el monto.
@@ -430,4 +465,19 @@ async function confirmarCategorias(
       ? `/cargar/${siguiente.id}`
       : `/categorias?corte=${resultado.corteId}&tienda=${tiendaId}`,
   );
+}
+
+async function confirmarLibroAjustes(extraccionId: string, respuestaCruda: string | null) {
+  if (!respuestaCruda) throw new Error("La lectura del libro está vacía.");
+  const lectura = JSON.parse(respuestaCruda) as LecturaLibroAjustes;
+  const resultado = await guardarLibroAjustes(prisma, lectura);
+
+  await prisma.extraccion.update({
+    where: { id: extraccionId },
+    data: { estado: "CONFIRMADO", corteId: resultado.corteId },
+  });
+  await sincronizarAlertas(resultado.corteId);
+
+  revalidatePath("/", "layout");
+  redirect(`/ajustes?corte=${resultado.corteId}`);
 }

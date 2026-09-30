@@ -20,7 +20,7 @@ const ESTADO_TEXTO: Record<string, string> = {
 
 const AVISOS: Record<string, string> = {
   falta: "Elige un corte y un archivo antes de continuar.",
-  tipo: "Ese formato no se puede leer. Acepta PDF, PNG, JPG o WEBP.",
+  tipo: "Ese formato no se puede leer. Acepta PDF, PNG, JPG, WEBP o el libro de ajustes en Excel.",
   peso: "El archivo supera los 4 MB. Exporta solo la página del tablero, o manda la foto en tamaño mediano.",
 };
 
