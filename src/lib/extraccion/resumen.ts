@@ -109,6 +109,7 @@ export async function guardarResumenEjecutivo(
   const conciliacionUnidades: Conciliacion["valores"] = [];
 
   let guardadas = 0;
+  const descuadres: AlertaDetectada[] = [];
 
   for (const fila of lectura.sucursales) {
     const emparejada = emparejarTienda(fila.sucursal, catalogo);
@@ -151,6 +152,32 @@ export async function guardarResumenEjecutivo(
       unidadesPorTicketInforme: fila.unidadesPorTicket,
       origen: "IA",
     };
+
+    // Si el acumulado ya tenía la venta de la tienda por su reporte por categoría o por el
+    // libro de ajustes, el Resumen la actualiza, pero antes se compara: si no coinciden, los
+    // dos documentos no cubren lo mismo y eso no se pisa callado.
+    const previo = await prisma.registroVentas.findUnique({
+      where: { corteId_tiendaId: { corteId: mes.id, tiendaId } },
+    });
+    if (
+      previo?.ventasReal &&
+      previo.origen !== "IA" &&
+      fila.mesVentas !== null &&
+      Math.abs(fila.mesVentas - previo.ventasReal) / previo.ventasReal > 0.005
+    ) {
+      descuadres.push({
+        tipo: "SUBTOTAL_DESCUADRADO",
+        severidad: "ALTA",
+        tiendaId,
+        indicador: "VENTA_RESUMEN_CONTRA_TIENDA",
+        valorObservado: Math.round(fila.mesVentas),
+        valorEsperado: Math.round(previo.ventasReal),
+        mensaje:
+          `${tienda}: el Resumen Ejecutivo da una venta acumulada de ${Math.round(fila.mesVentas).toLocaleString("es-VE")} ` +
+          `y el corte tenía ${Math.round(previo.ventasReal).toLocaleString("es-VE")} de otro documento. ` +
+          `Queda la del Resumen; confirmar cuál de los dos cubre el período completo.`,
+      });
+    }
 
     await prisma.registroVentas.upsert({
       where: { corteId_tiendaId: { corteId: mes.id, tiendaId } },
@@ -246,6 +273,7 @@ export async function guardarResumenEjecutivo(
   }
 
   const alertas = [
+    ...descuadres,
     ...conciliarIndicadores([
       {
         clave: "ticketPromedio",

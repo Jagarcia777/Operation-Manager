@@ -9,8 +9,8 @@ import { prisma } from "@/lib/db";
 import { ETIQUETA_BCG, ETIQUETA_PARETO, type ClaseBcg, type ZonaPareto } from "@/lib/dominio";
 import {
   agruparBajoCosto,
+  buscarBajoCosto,
   esProblemaDeCadena,
-  mismoProducto,
   type ProductoEnTiendas,
 } from "@/lib/extraccion/categoriasTienda";
 import { moneda, numero, porcentaje } from "@/lib/formato";
@@ -76,7 +76,21 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
   // abrirla por sucursal: esas filas llegan sin tienda. Rotularlas con el nombre de la zona
   // diría que esa venta es de las seis tiendas, y es de las veinticinco.
   const esDeLaCadena = registros.some((registro) => registro.tiendaId === null);
-  const alcance = tiendaActual ? tiendaActual.nombre : esDeLaCadena ? "Toda la cadena" : ambito;
+  // Con reporte de solo algunas tiendas de la zona, la mezcla es la de esas tiendas: se dice
+  // cuántas son y cuáles faltan, en vez de rotularla como si fuera toda la zona.
+  const conReporte = new Set(deTiendas.map((registro) => registro.tiendaId));
+  const deLaZona = tiendas.filter((tienda) => tienda.zona.detallada);
+  const faltantes =
+    !tiendaId && deTiendas.length
+      ? deLaZona.filter((tienda) => !conReporte.has(tienda.id)).map((tienda) => tienda.nombre)
+      : [];
+  const alcance = tiendaActual
+    ? tiendaActual.nombre
+    : esDeLaCadena
+      ? "Toda la cadena"
+      : faltantes.length
+        ? `${ambito} · ${deLaZona.length - faltantes.length} de ${deLaZona.length} tiendas`
+        : ambito;
 
   const porClase = (clase: ClaseBcg) =>
     analisis.filas.filter((fila) => fila.claseBcg === clase).length;
@@ -90,6 +104,13 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         tiendaId={tiendaId}
         alcance={alcance}
       />
+
+      {faltantes.length > 0 && (
+        <p className="tarjeta bg-atencion-tenue px-4 py-3 text-sm text-atencion">
+          Esta mezcla suma solo las tiendas con reporte cargado. Faltan {faltantes.join(", ")}: hasta
+          que se carguen, no es la mezcla de toda la zona.
+        </p>
+      )}
 
       {esDeLaCadena && (
         <p className="text-xs text-texto-3">
@@ -203,9 +224,11 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
           producto: fila.producto,
           ventasAprox: fila.ventasAprox,
           tienda: fila.tienda.nombre,
-          bajoCosto: bajoCosto.some(
-            (registro) =>
-              registro.tiendaId === fila.tiendaId && mismoProducto(fila.producto, registro.producto),
+          bajoCosto: Boolean(
+            buscarBajoCosto(
+              fila.producto,
+              bajoCosto.filter((registro) => registro.tiendaId === fila.tiendaId),
+            ),
           ),
         }))}
         deUnaTienda={Boolean(tiendaId)}

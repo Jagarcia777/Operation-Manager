@@ -3,8 +3,8 @@ import type { AlertaDetectada } from "@/lib/validacion";
 import {
   agruparBajoCosto,
   conciliarPorcentajes,
+  buscarBajoCosto,
   esProblemaDeCadena,
-  mismoProducto,
   type LecturaCategoriasTienda,
 } from "./categoriasTienda";
 import { indiceDeCategorias, normalizar } from "./emparejar";
@@ -291,12 +291,13 @@ export async function guardarCategoriasTienda(
       ventasAprox: producto.ventasAprox,
     })),
   });
-  const topBajoCosto = top.flatMap((producto) => {
-    const bajo = lectura.bajoCosto.find((candidato) =>
-      mismoProducto(producto.producto, candidato.producto),
-    );
-    return bajo ? [{ ...producto, codigo: bajo.codigo, nombre: bajo.producto }] : [];
-  });
+  const topBajoCosto = top
+    .flatMap((producto) => {
+      const bajo = buscarBajoCosto(producto.producto, lectura.bajoCosto);
+      return bajo ? [{ ...producto, codigo: bajo.codigo, nombre: bajo.producto }] : [];
+    })
+    // Un mismo producto no se alerta dos veces aunque dos filas del top casen con él.
+    .filter((producto, indice, lista) => lista.findIndex((otro) => otro.codigo === producto.codigo) === indice);
   for (const producto of topBajoCosto) {
     alertas.push({
       tipo: "VENTA_BAJO_COSTO",
@@ -364,7 +365,8 @@ export async function registrarAlertas(
   for (const alerta of alertas) {
     const existente = porFirma.get(firma(alerta));
     if (!existente) {
-      await prisma.alerta.create({ data: { ...alerta, corteId } });
+      const creada = await prisma.alerta.create({ data: { ...alerta, corteId } });
+      porFirma.set(firma(creada), creada);
       tocadas += 1;
     } else if (existente.estado === "ABIERTA") {
       await prisma.alerta.update({

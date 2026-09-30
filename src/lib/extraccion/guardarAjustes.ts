@@ -94,25 +94,46 @@ export async function guardarLibroAjustes(
     }
 
     const base = registro?.ventasReal ?? tienda.ventas;
-    await prisma.registroAjuste.deleteMany({ where: { corteId: corte.id, tiendaId } });
-    await prisma.registroAjuste.createMany({
-      data: tienda.tipologias.flatMap((ajuste) =>
-        ajuste.tipologia
-          ? [
-              {
-                corteId: corte.id,
-                tiendaId,
-                tipologia: ajuste.tipologia,
-                monto: ajuste.monto ?? 0,
-                unidades: ajuste.unidades,
-                porcentaje: base && ajuste.monto !== null ? (ajuste.monto / base) * 100 : null,
-                origen: "XLSX",
-              },
-            ]
-          : [],
-      ),
-      skipDuplicates: true,
-    });
+    // Lo que el libro cargó antes se reemplaza; lo que llegó por otra vía (el reporte de
+    // ajustes, la captura manual) no se pisa: si no coincide, se deja y se levanta la
+    // diferencia para que alguien decida cuál vale.
+    const existentes = await prisma.registroAjuste.findMany({ where: { corteId: corte.id, tiendaId } });
+    await prisma.registroAjuste.deleteMany({ where: { corteId: corte.id, tiendaId, origen: "XLSX" } });
+    for (const ajuste of tienda.tipologias) {
+      if (!ajuste.tipologia) continue;
+      const monto = ajuste.monto ?? 0;
+      const previo = existentes.find(
+        (registro) => registro.tipologia === ajuste.tipologia && registro.origen !== "XLSX",
+      );
+      if (previo) {
+        if (Math.abs(previo.monto - monto) > Math.max(1, Math.abs(previo.monto) * 0.005)) {
+          alertas.push({
+            tipo: "SUBTOTAL_DESCUADRADO",
+            severidad: "ALTA",
+            tiendaId,
+            indicador: `AJUSTE_LIBRO_${ajuste.tipologia}`,
+            valorObservado: monto,
+            valorEsperado: previo.monto,
+            mensaje:
+              `${tienda.nombre}: el libro da ${ajuste.etiqueta.toLowerCase()} de ${miles(monto)} $ y el ` +
+              `corte ya tenía ${miles(previo.monto)} $ de otra fuente. Se conserva el cargado hasta ` +
+              `que alguien confirme cuál vale.`,
+          });
+        }
+        continue;
+      }
+      await prisma.registroAjuste.create({
+        data: {
+          corteId: corte.id,
+          tiendaId,
+          tipologia: ajuste.tipologia,
+          monto,
+          unidades: ajuste.unidades,
+          porcentaje: base && ajuste.monto !== null ? (ajuste.monto / base) * 100 : null,
+          origen: "XLSX",
+        },
+      });
+    }
   }
   if (sinEmparejar.length) {
     alertas.push({

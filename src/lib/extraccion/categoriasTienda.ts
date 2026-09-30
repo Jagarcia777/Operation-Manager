@@ -224,11 +224,18 @@ function leerTop(items: ItemTexto[]): ProductoTopLeido[] {
     bloque.push(item);
   }
 
-  const esEtiqueta = (texto: string) => /^[\d.,]+\s*(mil|mill\.?|M)?$|…$/i.test(texto.trim());
-  const valores = bloque.filter((item) => esEtiqueta(item.texto) && /\d/.test(item.texto));
+  // Nombre y etiqueta se separan por posición, no por su forma: un nombre cortado con dígitos
+  // ("HARINA PAN 1KG AMARI…") parece una etiqueta. Las etiquetas empiezan donde empieza el eje,
+  // en la marca del cero; si no está, se usa la forma como respaldo.
+  const cero = bloque.find((item) => /^0\s*(mil|mill\.?|M)?$/i.test(item.texto.trim()));
+  const pareceEtiqueta = (texto: string) => /^[\d.,]+\s*(mil|mill\.?|M)?$|^[\d.,]+\s*…$/i.test(texto.trim());
+  const esValor = (item: ItemTexto) =>
+    cero ? item.x >= cero.x - 5 && item.y > cero.y + 2 : pareceEtiqueta(item.texto);
+  const rotulos = ["Producto", "Ventas USD"];
+  const valores = bloque.filter((item) => esValor(item) && /\d/.test(item.texto));
   const nombres = bloque.filter(
-    (item) => !esEtiqueta(item.texto) || !/\d/.test(item.texto),
-  ).filter((item) => !["Producto", "Ventas USD"].includes(item.texto.trim()));
+    (item) => !esValor(item) && !rotulos.includes(item.texto.trim()) && (!cero || item.y > cero.y + 2),
+  );
 
   return nombres
     .filter((nombre) => valores.some((valor) => Math.abs(valor.y - nombre.y) <= 2))
@@ -250,7 +257,21 @@ function leerTop(items: ItemTexto[]): ProductoTopLeido[] {
 export function mismoProducto(delTop: string, completo: string) {
   const top = normalizarNombre(delTop.replace(/…$/, ""));
   const otro = normalizarNombre(completo);
-  return delTop.trim().endsWith("…") ? otro.startsWith(top) : top === otro;
+  if (!delTop.trim().endsWith("…")) return top === otro;
+  // Un prefijo corto ("HARINA PAN…") casa con demasiados productos: no alcanza para afirmar
+  // que es el mismo. El gráfico corta alrededor de los 25 caracteres.
+  return top.length >= LARGO_MINIMO_PREFIJO && otro.startsWith(top);
+}
+
+const LARGO_MINIMO_PREFIJO = 15;
+
+/**
+ * El producto bajo costo que corresponde a uno del top, solo si hay uno y solo uno: si un
+ * nombre cortado casa con dos, no se sabe cuál es y no se afirma ninguno.
+ */
+export function buscarBajoCosto<T extends { producto: string }>(delTop: string, lista: T[]) {
+  const candidatos = lista.filter((candidato) => mismoProducto(delTop, candidato.producto));
+  return candidatos.length === 1 ? candidatos[0] : null;
 }
 
 function normalizarNombre(texto: string) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { mismoProducto, type LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
+import { buscarBajoCosto, type LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
 import { emparejarTienda, indiceDeCategorias, normalizar } from "@/lib/extraccion/emparejar";
 import { datosDelCorte } from "@/lib/extraccion/guardarCategorias";
 import { moneda, numero, porcentaje } from "@/lib/formato";
@@ -219,9 +219,7 @@ export async function RevisarCategorias({
             <h2 className="text-sm font-semibold">Lo que más vende la tienda</h2>
             <ol className="mt-2 grid gap-x-6 gap-y-1 text-sm text-texto-2 sm:grid-cols-2">
               {lectura.topProductos!.map((producto) => {
-                const bajoCosto = lectura.bajoCosto.some((candidato) =>
-                  mismoProducto(producto.producto, candidato.producto),
-                );
+                const bajoCosto = Boolean(buscarBajoCosto(producto.producto, lectura.bajoCosto));
                 return (
                   <li key={producto.posicion} className="flex justify-between gap-3">
                     <span>

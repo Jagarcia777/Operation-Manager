@@ -6,6 +6,7 @@ import {
   esProblemaDeCadena,
   esReporteCategoriasTienda,
   leerCategoriasTienda,
+  buscarBajoCosto,
   leerMagnitud,
   mismoProducto,
   type ItemTexto,
@@ -47,9 +48,12 @@ function reporte({
     { texto: "CARNE DE PRIMERA.", x: 525, y: 750 },
     { texto: "COSTILLA RES", x: 545, y: 734 },
     { texto: "LECHE EN POLVO COMPLETA CA…", x: 484, y: 718 },
+    // Un nombre cortado con dígitos: por su forma parece etiqueta, por su posición es nombre.
+    { texto: "HARINA PAN 1KG AMARI…", x: 486, y: 702 },
     { texto: "135 mil", x: 605, y: 750 },
     { texto: "8 mil", x: 605, y: 734 },
     { texto: "13 …", x: 605, y: 718 },
+    { texto: "7 mil", x: 605, y: 702 },
     { texto: "Productos vendidos con costo mayor o igual al PVP", x: 457, y: 989 },
     { texto: "Sucursal", x: 461, y: 971 },
     { texto: "barra", x: 539, y: 971 },
@@ -217,6 +221,7 @@ describe("top de productos de la tienda", () => {
       { posicion: 1, producto: "CARNE DE PRIMERA.", ventasAprox: 135000 },
       { posicion: 2, producto: "COSTILLA RES", ventasAprox: 8000 },
       { posicion: 3, producto: "LECHE EN POLVO COMPLETA CA…", ventasAprox: null },
+      { posicion: 4, producto: "HARINA PAN 1KG AMARI…", ventasAprox: 7000 },
     ]);
   });
 
@@ -231,5 +236,16 @@ describe("top de productos de la tienda", () => {
     assert.ok(mismoProducto("LECHE EN POLVO COMPLETA CA…", "LECHE EN POLVO COMPLETA CAMPIÑA 862G"));
     assert.ok(mismoProducto("COSTILLA RES", "Costilla res"));
     assert.equal(mismoProducto("COSTILLA RES", "COSTILLA RES AHUMADA"), false);
+  });
+
+  it("no afirma nada con un prefijo corto ni cuando casa con dos productos", () => {
+    assert.equal(mismoProducto("HARINA PAN…", "HARINA PAN AMARILLA 1KG"), false);
+    assert.equal(mismoProducto("…", "CUALQUIER COSA"), false);
+    const lista = [
+      { producto: "LECHE EN POLVO COMPLETA CAMPIÑA 862G" },
+      { producto: "LECHE EN POLVO COMPLETA CARABOBO 400G" },
+    ];
+    assert.equal(buscarBajoCosto("LECHE EN POLVO COMPLETA CA…", lista), null);
+    assert.equal(buscarBajoCosto("LECHE EN POLVO COMPLETA CA…", lista.slice(0, 1)), lista[0]);
   });
 });
