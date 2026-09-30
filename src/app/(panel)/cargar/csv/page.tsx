@@ -54,7 +54,7 @@ export default async function ImportarCsvPage({ searchParams }: PageProps<"/carg
           nombre="archivo"
           acepta=".csv,text/csv"
           maximoBytes={TAMANO_MAXIMO}
-          etiqueta="Archivo CSV"
+          etiqueta="CSV"
         />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a href="/api/plantilla-csv" className="boton boton-secundario" download>
