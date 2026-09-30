@@ -11,7 +11,7 @@ import { DESTINOS_EXTRACCION, ETIQUETA_DESTINO, type DestinoExtraccion } from "@
  */
 export function SelectorDestino({ cortes }: { cortes: { id: string; nombre: string }[] }) {
   const [destino, setDestino] = useState<DestinoExtraccion>("RESUMEN");
-  const propioCorte = destino === "RESUMEN";
+  const propioCorte = destino === "RESUMEN" || destino === "CATEGORIAS";
 
   return (
     <div className="space-y-4">
@@ -44,11 +44,18 @@ export function SelectorDestino({ cortes }: { cortes: { id: string; nombre: stri
         </label>
       </div>
 
-      {propioCorte && (
+      {destino === "RESUMEN" && (
         <p className="text-xs text-texto-3">
           El Resumen Ejecutivo trae su fecha impresa: la aplicación crea con ella el corte del
           día y el del acumulado del mes, y carga además la mezcla por categoría, el top de
           productos y la serie diaria de la cadena.
+        </p>
+      )}
+      {destino === "CATEGORIAS" && (
+        <p className="text-xs text-texto-3">
+          El reporte de ventas por categoría de cada tienda se lee directo del PDF, sin IA: trae
+          su período y su tienda. Puedes subir los de todas las tiendas a la vez; la aplicación
+          los reconoce aunque elijas otro tipo de documento.
         </p>
       )}
     </div>

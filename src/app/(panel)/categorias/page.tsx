@@ -7,6 +7,11 @@ import { analizarCategorias, consolidarCategorias } from "@/lib/categorias";
 import { cargarProductos, cargarTiendas, listarCortes, resolverCorte } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { ETIQUETA_BCG, ETIQUETA_PARETO, type ClaseBcg, type ZonaPareto } from "@/lib/dominio";
+import {
+  agruparBajoCosto,
+  esProblemaDeCadena,
+  type ProductoEnTiendas,
+} from "@/lib/extraccion/categoriasTienda";
 import { moneda, numero, porcentaje } from "@/lib/formato";
 
 const TONO_BCG: Record<ClaseBcg, string> = {
@@ -28,10 +33,22 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
   ]);
   if (!corte) return <EstadoVacio mensaje="No hay cortes cargados todavía." />;
 
-  const registros = await prisma.registroCategoria.findMany({
-    where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
-    include: { categoria: true },
-  });
+  const [encontrados, bajoCosto] = await Promise.all([
+    prisma.registroCategoria.findMany({
+      where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
+      include: { categoria: true },
+    }),
+    prisma.productoBajoCosto.findMany({
+      where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
+      include: { tienda: { select: { nombre: true } } },
+    }),
+  ]);
+  // Si el corte tiene el reporte por categoría de las tiendas, la vista de conjunto es la suma
+  // de esas tiendas. La mezcla consolidada de la cadena solo se usa cuando no hay otra: sumar
+  // las dos contaría dos veces la venta de la zona.
+  const deTiendas = encontrados.filter((registro) => registro.tiendaId !== null);
+  const registros = !tiendaId && deTiendas.length ? deTiendas : encontrados;
+  const tiendasConReporte = new Set(deTiendas.map((registro) => registro.tiendaId)).size;
 
   if (registros.length === 0) {
     return (
@@ -71,8 +88,8 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
       {esDeLaCadena && (
         <p className="text-xs text-texto-3">
           Esta mezcla viene del Resumen Ejecutivo, que la publica consolidada para toda la
-          cadena y no abierta por sucursal. Para verla por tienda hace falta cargar el detalle
-          por categoría de cada una.
+          cadena y no abierta por sucursal. Para verla por tienda, sube en Cargar datos el
+          reporte de ventas por categoría de cada una.
         </p>
       )}
 
@@ -174,6 +191,18 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         Ambos umbrales se calculan sobre las categorías de este mismo corte, no contra una tabla fija.
       </p>
 
+      <BajoCosto
+        grupos={agruparBajoCosto(
+          bajoCosto.map((registro) => ({
+            codigo: registro.codigo,
+            producto: registro.producto,
+            tienda: registro.tienda.nombre,
+          })),
+        )}
+        tiendasCargadas={tiendaId ? 1 : tiendasConReporte}
+        deUnaTienda={Boolean(tiendaId)}
+      />
+
       {(productos.perecederos.length > 0 || productos.noPerecederos.length > 0) && (
         <section className="grid gap-4 lg:grid-cols-2">
           <TopProductos titulo="Perecederos" filas={productos.perecederos} />
@@ -181,6 +210,71 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Productos que las tiendas vendieron a costo o por debajo en el período. El mismo producto en
+ * varias tiendas no se arregla tienda por tienda: es un precio o un costo mal cargado para la
+ * cadena, y por eso va primero y marcado.
+ */
+function BajoCosto({
+  grupos,
+  tiendasCargadas,
+  deUnaTienda,
+}: {
+  grupos: ProductoEnTiendas[];
+  tiendasCargadas: number;
+  deUnaTienda: boolean;
+}) {
+  if (!grupos.length) return null;
+  const deCadena = grupos.filter((grupo) => esProblemaDeCadena(grupo.tiendas.length)).length;
+
+  return (
+    <section className="tarjeta overflow-hidden">
+      <div className="px-5 pt-5 pb-3">
+        <h2 className="text-base font-semibold tracking-[-0.02em]">
+          Vendidos a costo o por debajo
+        </h2>
+        <p className="mt-1 text-sm text-texto-3">
+          {deUnaTienda
+            ? `${grupos.length} productos en esta tienda.`
+            : `${grupos.length} productos en ${tiendasCargadas} tiendas con reporte${
+                deCadena ? `; ${deCadena} se repiten en varias y apuntan a un precio de cadena` : ""
+              }.`}{" "}
+          El PDF solo trae las filas que caben en pantalla, así que la lista puede no estar completa.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="tabla min-w-[640px]">
+          <thead>
+            <tr>
+              <th className="text-left">Producto</th>
+              <th className="text-left">Código</th>
+              {!deUnaTienda && <th className="text-left">Tiendas</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {grupos.map((grupo) => (
+              <tr key={grupo.codigo}>
+                <td className="text-left font-medium">
+                  {grupo.producto}
+                  {!deUnaTienda && esProblemaDeCadena(grupo.tiendas.length) && (
+                    <span className="chip ml-2 bg-alerta-tenue text-alerta">Precio de cadena</span>
+                  )}
+                </td>
+                <td className="text-left text-texto-3 tabular-nums">{grupo.codigo}</td>
+                {!deUnaTienda && (
+                  <td className="text-left text-texto-2">
+                    {grupo.tiendas.length} · {grupo.tiendas.join(", ")}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

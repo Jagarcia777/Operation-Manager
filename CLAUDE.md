@@ -50,6 +50,7 @@ src/lib/analisis/         cerebro analítico: evidencia determinista + asesoría
 src/lib/extraccion/       ingesta con IA de PDF/imagen
 src/lib/extraccion/resumen.ts    guarda el Resumen Ejecutivo de la cadena (día + acumulado)
 src/lib/extraccion/conciliar.ts  lo impreso contra lo derivado
+src/lib/extraccion/categoriasTienda.ts  reporte por categoría de una tienda, leído del PDF sin IA
 src/lib/documentos/       generación de PPTX/DOCX
 src/components/           componentes compartidos de UI
 src/components/graficos/  gráficos en SVG propio (sin librerías: no se cargan terceros)

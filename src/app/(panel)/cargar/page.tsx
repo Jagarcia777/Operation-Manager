@@ -71,8 +71,9 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
 
       {!conClave && (
         <div className="tarjeta border-atencion-tenue bg-atencion-tenue px-4 py-3 text-sm text-atencion">
-          Falta <code>ANTHROPIC_API_KEY</code> en las variables de entorno. Sin ella la lectura
-          automática queda desactivada; el resto de la aplicación funciona igual.
+          Falta <code>ANTHROPIC_API_KEY</code> en las variables de entorno. Sin ella solo se leen
+          los reportes de ventas por categoría de cada tienda, que no necesitan IA; el resto de la
+          aplicación funciona igual.
         </div>
       )}
 
@@ -85,13 +86,15 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
             nombre="archivo"
             acepta={ACEPTA}
             maximoBytes={TAMANO_MAXIMO}
+            varios
           />
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-texto-3">
               El archivo se guarda en tu equipo. Al modelo solo se le envía este documento.
             </p>
-            <button type="submit" className="boton boton-primario" disabled={!conClave}>
+            {/* Sin clave sigue activo: el reporte de categorías por tienda no necesita IA. */}
+            <button type="submit" className="boton boton-primario">
               Leer documento
             </button>
           </div>

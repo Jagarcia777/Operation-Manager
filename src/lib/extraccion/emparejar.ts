@@ -67,3 +67,20 @@ export function emparejarTienda(
 export function emparejarTodas(nombres: string[], catalogo: TiendaCatalogo[]) {
   return nombres.map((nombre) => emparejarTienda(nombre, catalogo));
 }
+
+/**
+ * Índice de categorías por nombre y por cada alias con que las escribe el sistema emisor
+ * ("FRUTO SECOS" para Frutos Secos). Se busca con el nombre ya normalizado.
+ */
+export function indiceDeCategorias<T extends { nombre: string; alias: string | null }>(
+  categorias: T[],
+): Map<string, T> {
+  const porNombre = new Map<string, T>();
+  for (const categoria of categorias) {
+    porNombre.set(normalizar(categoria.nombre), categoria);
+    for (const alias of (categoria.alias ?? "").split(/[\n,;]/)) {
+      if (alias.trim()) porNombre.set(normalizar(alias), categoria);
+    }
+  }
+  return porNombre;
+}

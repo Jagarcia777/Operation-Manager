@@ -12,12 +12,15 @@ export function CampoArchivo({
   acepta,
   maximoBytes,
   etiqueta,
+  varios = false,
 }: {
   nombre: string;
   acepta: string;
   maximoBytes: number;
   /** Los formatos que se aceptan, en palabras; por omisión, los documentos que lee la IA. */
   etiqueta?: string;
+  /** Permite elegir varios archivos; el tope de peso es para el envío completo. */
+  varios?: boolean;
 }) {
   const [excedido, setExcedido] = useState<string | null>(null);
   const maximoMb = Math.round(maximoBytes / (1024 * 1024));
@@ -33,11 +36,15 @@ export function CampoArchivo({
           name={nombre}
           accept={acepta}
           required
+          multiple={varios}
           onChange={(evento) => {
-            const archivo = evento.target.files?.[0];
-            if (archivo && archivo.size > maximoBytes) {
-              const pesa = (archivo.size / (1024 * 1024)).toFixed(1);
-              setExcedido(`Ese archivo pesa ${pesa} MB y el máximo es ${maximoMb} MB.`);
+            const archivos = [...(evento.target.files ?? [])];
+            const peso = archivos.reduce((total, archivo) => total + archivo.size, 0);
+            if (peso > maximoBytes) {
+              const pesa = (peso / (1024 * 1024)).toFixed(1);
+              setExcedido(
+                `${archivos.length > 1 ? "Esos archivos pesan" : "Ese archivo pesa"} ${pesa} MB y el máximo es ${maximoMb} MB.`,
+              );
               evento.target.value = "";
               return;
             }
