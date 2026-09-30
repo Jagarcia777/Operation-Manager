@@ -156,7 +156,7 @@ function pseudoAleatorio(semilla: number) {
 
 async function main() {
   if (SOLO_CATALOGO && (await prisma.zona.count()) > 0) {
-    console.log("El catálogo ya está cargado; no se toca nada.");
+    await completarCatalogo();
     return;
   }
 
@@ -450,6 +450,85 @@ async function sembrarBenchmarks() {
  * el valor sí viene cargado: es la referencia internacional publicada, no una meta del negocio.
  * El usuario la calibra desde Configuración cuando tenga histórico propio.
  */
+/**
+ * Una base ya instalada no se vuelve a sembrar: lo que se editó en Configuración manda. Pero el
+ * catálogo creció después de la primera instalación —las 19 sucursales del resto de la cadena,
+ * las 29 categorías del Resumen Ejecutivo con sus alias, las áreas de la plantilla— y sin eso
+ * la lectura de los informes no reconoce la mitad de las filas. Aquí solo se agrega lo que
+ * falta y se rellenan alias vacíos; nada se borra, se renombra ni se sobrescribe.
+ */
+async function completarCatalogo() {
+  const agregados: string[] = [];
+
+  const zonaPropia =
+    (await prisma.zona.findUnique({ where: { nombre: ZONA_ORIENTE.nombre } })) ??
+    (await prisma.perfil.findUnique({ where: { id: "maestro" }, include: { zonaPropia: true } }))
+      ?.zonaPropia;
+  let resto = await prisma.zona.findUnique({ where: { nombre: ZONA_RESTO.nombre } });
+  if (!resto) {
+    const ultima = await prisma.zona.aggregate({ _max: { orden: true } });
+    resto = await prisma.zona.create({
+      data: { ...ZONA_RESTO, orden: (ultima._max.orden ?? 0) + 1 },
+    });
+    agregados.push(`zona ${ZONA_RESTO.nombre}`);
+  }
+
+  const bloques = [
+    { zonaId: zonaPropia?.id, tiendas: TIENDAS_ORIENTE },
+    { zonaId: resto.id, tiendas: TIENDAS_RESTO },
+  ];
+  for (const { zonaId, tiendas } of bloques) {
+    if (!zonaId) continue;
+    for (const [indice, tienda] of tiendas.entries()) {
+      const codigo = "codigo" in tienda ? tienda.codigo : undefined;
+      const existente = await prisma.tienda.findFirst({
+        where: { OR: [{ nombre: tienda.nombre }, ...(codigo ? [{ codigo }] : [])] },
+      });
+      if (!existente) {
+        await prisma.tienda.create({ data: { ...tienda, zonaId, orden: indice + 1 } });
+        agregados.push(tienda.nombre);
+      } else if (!existente.alias && tienda.alias) {
+        await prisma.tienda.update({ where: { id: existente.id }, data: { alias: tienda.alias } });
+      }
+    }
+  }
+
+  const ultimaCategoria = await prisma.categoria.aggregate({ _max: { orden: true } });
+  let orden = ultimaCategoria._max.orden ?? 0;
+  for (const categoria of CATEGORIAS) {
+    const existente = await prisma.categoria.findUnique({ where: { nombre: categoria.nombre } });
+    if (!existente) {
+      orden += 1;
+      await prisma.categoria.create({ data: { ...categoria, alias: categoria.alias ?? null, orden } });
+      agregados.push(categoria.nombre);
+    } else if (!existente.alias && categoria.alias) {
+      await prisma.categoria.update({
+        where: { id: existente.id },
+        data: { alias: categoria.alias },
+      });
+    }
+  }
+
+  const areasAntes = await prisma.areaOperativa.count();
+  if (areasAntes < AREAS_OPERATIVAS.length) {
+    for (const [indice, area] of AREAS_OPERATIVAS.entries()) {
+      const existente = await prisma.areaOperativa.findUnique({ where: { nombre: area.nombre } });
+      if (existente) continue;
+      await prisma.areaOperativa.create({
+        data: { ...area, usaVentaTienda: area.usaVentaTienda ?? false, orden: indice + 1 },
+      });
+      agregados.push(`área ${area.nombre}`);
+    }
+  }
+  if ((await prisma.umbral.count()) === 0) await sembrarUmbrales();
+
+  console.log(
+    agregados.length
+      ? `Catálogo completado, sin tocar lo existente: ${agregados.length} altas (${agregados.join(", ")}).`
+      : "El catálogo ya está completo; no se toca nada.",
+  );
+}
+
 async function sembrarAreas() {
   for (const [indice, area] of AREAS_OPERATIVAS.entries()) {
     await prisma.areaOperativa.upsert({

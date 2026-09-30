@@ -99,7 +99,9 @@ estén vacías. Para pasar a tus datos:
 4. **Despliega.** El script `vercel-build` aplica las migraciones, carga el catálogo de Zona
    Oriente si la base está vacía y compila. No hay pasos manuales: la primera vez que despliegas,
    las seis tiendas, las zonas de comparación y las categorías quedan puestas. En los despliegues
-   siguientes el catálogo no se toca, así que lo que edites desde Configuración manda.
+   siguientes solo se agrega lo que el catálogo no tenga todavía (una sucursal, una categoría o
+   un área nuevas) y se rellenan alias vacíos: nada se borra ni se renombra, así que lo que
+   edites desde Configuración manda.
 
 Los documentos que subes se guardan en la base y no en disco, porque en Vercel el sistema de
 archivos es de solo lectura y se reinicia en cada despliegue.
@@ -122,7 +124,7 @@ npm run lint            # eslint
 npm start               # servir el build de producción
 npm run auth:hash       # generar contraseña y secreto de sesión
 npm run db:seed         # catálogo y datos de ejemplo
-npm run db:catalogo     # solo el catálogo, y solo si la base está vacía
+npm run db:catalogo     # catálogo: completo si la base está vacía; si no, solo lo que falte
 npm run db:reset        # recrear la base desde cero
 npx prisma studio       # ver y editar la base
 ```
