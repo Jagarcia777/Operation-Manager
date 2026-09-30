@@ -10,6 +10,7 @@ import { ETIQUETA_BCG, ETIQUETA_PARETO, type ClaseBcg, type ZonaPareto } from "@
 import {
   agruparBajoCosto,
   esProblemaDeCadena,
+  mismoProducto,
   type ProductoEnTiendas,
 } from "@/lib/extraccion/categoriasTienda";
 import { moneda, numero, porcentaje } from "@/lib/formato";
@@ -33,7 +34,7 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
   ]);
   if (!corte) return <EstadoVacio mensaje="No hay cortes cargados todavía." />;
 
-  const [encontrados, bajoCosto] = await Promise.all([
+  const [encontrados, bajoCosto, topTiendas] = await Promise.all([
     prisma.registroCategoria.findMany({
       where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
       include: { categoria: true },
@@ -41,6 +42,11 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
     prisma.productoBajoCosto.findMany({
       where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
       include: { tienda: { select: { nombre: true } } },
+    }),
+    prisma.topProductoTienda.findMany({
+      where: { corteId: corte.id, ...(tiendaId ? { tiendaId } : {}) },
+      include: { tienda: { select: { nombre: true } } },
+      orderBy: { posicion: "asc" },
     }),
   ]);
   // Si el corte tiene el reporte por categoría de las tiendas, la vista de conjunto es la suma
@@ -191,6 +197,20 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         Ambos umbrales se calculan sobre las categorías de este mismo corte, no contra una tabla fija.
       </p>
 
+      <TopDeTiendas
+        filas={topTiendas.map((fila) => ({
+          posicion: fila.posicion,
+          producto: fila.producto,
+          ventasAprox: fila.ventasAprox,
+          tienda: fila.tienda.nombre,
+          bajoCosto: bajoCosto.some(
+            (registro) =>
+              registro.tiendaId === fila.tiendaId && mismoProducto(fila.producto, registro.producto),
+          ),
+        }))}
+        deUnaTienda={Boolean(tiendaId)}
+      />
+
       <BajoCosto
         grupos={agruparBajoCosto(
           bajoCosto.map((registro) => ({
@@ -210,6 +230,111 @@ export default async function CategoriasPage({ searchParams }: PageProps<"/categ
         </section>
       )}
     </div>
+  );
+}
+
+type FilaTop = {
+  posicion: number;
+  producto: string;
+  ventasAprox: number | null;
+  tienda: string;
+  bajoCosto: boolean;
+};
+
+/**
+ * Qué sostiene la venta. En una tienda, su top en orden; en la zona, los productos que se
+ * repiten en el top de varias tiendas, que son los que no pueden faltar en ninguna. Un producto
+ * del top que se vende bajo costo va marcado: es la pérdida que más se repite.
+ */
+function TopDeTiendas({ filas, deUnaTienda }: { filas: FilaTop[]; deUnaTienda: boolean }) {
+  if (!filas.length) return null;
+
+  if (deUnaTienda) {
+    return (
+      <section className="tarjeta overflow-hidden">
+        <div className="px-5 pt-5 pb-3">
+          <h2 className="text-base font-semibold tracking-[-0.02em]">Lo que más vende</h2>
+          <p className="mt-1 text-sm text-texto-3">
+            Venta aproximada: el reporte la grafica redondeada a miles.
+          </p>
+        </div>
+        <table className="tabla">
+          <tbody>
+            {filas.map((fila) => (
+              <tr key={fila.posicion}>
+                <td className="w-8 text-left text-texto-3 tabular-nums">{fila.posicion}</td>
+                <td className="text-left">
+                  {fila.producto}
+                  {fila.bajoCosto && (
+                    <span className="chip ml-2 bg-alerta-tenue text-alerta">Bajo costo</span>
+                  )}
+                </td>
+                <td className="font-medium">
+                  {fila.ventasAprox ? `~${moneda(fila.ventasAprox)}` : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    );
+  }
+
+  const porProducto = new Map<string, { tiendas: string[]; venta: number; bajoCosto: string[] }>();
+  for (const fila of filas) {
+    const actual = porProducto.get(fila.producto) ?? { tiendas: [], venta: 0, bajoCosto: [] };
+    actual.tiendas.push(fila.tienda);
+    actual.venta += fila.ventasAprox ?? 0;
+    if (fila.bajoCosto) actual.bajoCosto.push(fila.tienda);
+    porProducto.set(fila.producto, actual);
+  }
+  const tiendas = new Set(filas.map((fila) => fila.tienda)).size;
+  const repetidos = [...porProducto]
+    .filter(([, valores]) => valores.tiendas.length > 1)
+    .sort((a, b) => b[1].tiendas.length - a[1].tiendas.length || b[1].venta - a[1].venta);
+  if (!repetidos.length) return null;
+
+  return (
+    <section className="tarjeta overflow-hidden">
+      <div className="px-5 pt-5 pb-3">
+        <h2 className="text-base font-semibold tracking-[-0.02em]">
+          Lo que más se vende en la zona
+        </h2>
+        <p className="mt-1 text-sm text-texto-3">
+          Productos que están en el top de más de una de las {tiendas} tiendas con reporte. Venta
+          aproximada, sumada de las etiquetas redondeadas del gráfico.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="tabla min-w-[560px]">
+          <thead>
+            <tr>
+              <th className="text-left">Producto</th>
+              <th>Tiendas</th>
+              <th>Venta aprox.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repetidos.map(([producto, valores]) => (
+              <tr key={producto}>
+                <td className="text-left">
+                  {producto}
+                  {valores.bajoCosto.length > 0 && (
+                    <span className="chip ml-2 bg-alerta-tenue text-alerta">
+                      Bajo costo en {valores.bajoCosto.join(", ")}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {valores.tiendas.length} de {tiendas}
+                </td>
+                <td className="font-medium">~{moneda(valores.venta)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

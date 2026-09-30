@@ -131,7 +131,7 @@ si algo queda a medias.
 - [x] Ajuste por categoría de cada tienda y de la cadena, contra la venta de la categoría
 - [x] Cadena como línea de comparación y CENDI Timote como centro que abastece a Oriente
 - [x] Venta del libro contrastada con el ritmo conocido: detecta un período que no cuadra
-- [ ] Top 10 de productos por tienda
+- [x] Top 10 de productos por tienda, cruzado con los que se venden bajo costo
 
 ## Pendiente del lado del usuario
 

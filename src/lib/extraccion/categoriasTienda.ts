@@ -25,6 +25,14 @@ export type FilaCategoriaTienda = {
 
 export type ProductoBajoCostoLeido = { sucursal: string; codigo: string; producto: string };
 
+export type ProductoTopLeido = {
+  posicion: number;
+  /** Como lo rotula el gráfico: los nombres largos llegan cortados con "…". */
+  producto: string;
+  /** La etiqueta de la barra viene redondeada ("135 mil"): es una magnitud, no una cifra exacta. */
+  ventasAprox: number | null;
+};
+
 export type LecturaCategoriasTienda = {
   tipo: "CATEGORIAS_TIENDA";
   /** Nombre de la sucursal tal como lo trae el reporte, completo si se puede. */
@@ -37,11 +45,14 @@ export type LecturaCategoriasTienda = {
   categorias: FilaCategoriaTienda[];
   total: { ventas: number | null; unidades: number | null; margen: number | null };
   bajoCosto: ProductoBajoCostoLeido[];
+  /** Top de productos por venta, en orden. Puede faltar en lecturas anteriores a este campo. */
+  topProductos?: ProductoTopLeido[];
   observaciones: string[];
 };
 
 const TITULO_CATEGORIAS = "VENTAS POR CATEGORIA";
 const TITULO_BAJO_COSTO = "Productos vendidos con costo mayor o igual al PVP";
+const TITULO_TOP = "TOP 20 Productos de mayor venta";
 const FILAS_VISIBLES_BAJO_COSTO = 12;
 
 /** Íconos del tablero: caracteres del área de uso privado, sin significado para los datos. */
@@ -188,12 +199,76 @@ function leerBajoCosto(items: ItemTexto[]): ProductoBajoCostoLeido[] {
   return productos;
 }
 
+/** "135 mil" → 135.000; "2 mill." → 2.000.000; una etiqueta cortada ("13 …") no se adivina. */
+export function leerMagnitud(texto: string): number | null {
+  const partes = texto.trim().match(/^([\d.,]+)\s*(mil|mill\.?|M)?$/i);
+  if (!partes) return null;
+  const base = Number(partes[1].replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(base)) return null;
+  const unidad = partes[2]?.toLowerCase();
+  return unidad === "mil" ? base * 1_000 : unidad ? base * 1_000_000 : base;
+}
+
+/**
+ * El top es un gráfico de barras: el nombre del producto a la izquierda y la etiqueta de la
+ * barra a la derecha, a la misma altura. Las marcas del eje quedan debajo y no tienen nombre a
+ * su altura, así que se descartan solas. El título dice 20, pero el PDF trae los que caben.
+ */
+function leerTop(items: ItemTexto[]): ProductoTopLeido[] {
+  const inicio = items.findIndex((item) => item.texto.trim() === TITULO_TOP);
+  if (inicio < 0) return [];
+  const titulo = items[inicio];
+  const bloque: ItemTexto[] = [];
+  for (const item of items.slice(inicio + 1)) {
+    if (item.y >= titulo.y) break;
+    bloque.push(item);
+  }
+
+  const esEtiqueta = (texto: string) => /^[\d.,]+\s*(mil|mill\.?|M)?$|…$/i.test(texto.trim());
+  const valores = bloque.filter((item) => esEtiqueta(item.texto) && /\d/.test(item.texto));
+  const nombres = bloque.filter(
+    (item) => !esEtiqueta(item.texto) || !/\d/.test(item.texto),
+  ).filter((item) => !["Producto", "Ventas USD"].includes(item.texto.trim()));
+
+  return nombres
+    .filter((nombre) => valores.some((valor) => Math.abs(valor.y - nombre.y) <= 2))
+    .sort((a, b) => b.y - a.y)
+    .map((nombre, indice) => {
+      const valor = valores.find((candidato) => Math.abs(candidato.y - nombre.y) <= 2)!;
+      return {
+        posicion: indice + 1,
+        producto: nombre.texto.trim(),
+        ventasAprox: leerMagnitud(valor.texto),
+      };
+    });
+}
+
+/**
+ * ¿Es este producto del top uno de los que se venden bajo costo? El top corta los nombres
+ * largos con "…", así que un nombre cortado casa por su comienzo.
+ */
+export function mismoProducto(delTop: string, completo: string) {
+  const top = normalizarNombre(delTop.replace(/…$/, ""));
+  const otro = normalizarNombre(completo);
+  return delTop.trim().endsWith("…") ? otro.startsWith(top) : top === otro;
+}
+
+function normalizarNombre(texto: string) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
 export function leerCategoriasTienda(crudos: ItemTexto[]): LecturaCategoriasTienda {
   const items = limpiar(crudos);
   const observaciones: string[] = [];
 
   const { categorias, total } = leerCategorias(items, observaciones);
   const bajoCosto = leerBajoCosto(items);
+  const topProductos = leerTop(items);
 
   const fechas = items.filter((item) => /^\d{2}\/\d{2}\/\d{4}$/.test(item.texto.trim()));
   const desde = fechas[0] ? aIso(fechas[0].texto.trim()) : null;
@@ -249,6 +324,7 @@ export function leerCategoriasTienda(crudos: ItemTexto[]): LecturaCategoriasTien
     categorias,
     total,
     bajoCosto,
+    topProductos,
     observaciones,
   };
 }

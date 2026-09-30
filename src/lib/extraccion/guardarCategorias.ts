@@ -4,6 +4,7 @@ import {
   agruparBajoCosto,
   conciliarPorcentajes,
   esProblemaDeCadena,
+  mismoProducto,
   type LecturaCategoriasTienda,
 } from "./categoriasTienda";
 import { indiceDeCategorias, normalizar } from "./emparejar";
@@ -22,6 +23,7 @@ type Cliente = Pick<
   | "registroCategoria"
   | "registroVentas"
   | "productoBajoCosto"
+  | "topProductoTienda"
   | "alerta"
 >;
 
@@ -274,15 +276,60 @@ export async function guardarCategoriasTienda(
     });
   }
 
-  // Una alerta de cadena abierta que ya no se cumple —se recargó un reporte corregido— se
-  // retira: dejarla diría que el producto sigue bajo costo en tiendas donde ya no lo está. Las
-  // que alguien revisó o descartó quedan como constancia.
+  // ── Top de productos de la tienda ───────────────────────────────────────────
+  // Un producto del top que además se vende a costo o por debajo es la pérdida más cara de
+  // la lista: es de lo que más sale, y cada venta pierde. Eso sí es un caso de la tienda,
+  // aunque el precio se corrija para toda la cadena.
+  const top = lectura.topProductos ?? [];
+  await prisma.topProductoTienda.deleteMany({ where: { corteId: corte.id, tiendaId } });
+  await prisma.topProductoTienda.createMany({
+    data: top.map((producto) => ({
+      corteId: corte.id,
+      tiendaId,
+      posicion: producto.posicion,
+      producto: producto.producto,
+      ventasAprox: producto.ventasAprox,
+    })),
+  });
+  const topBajoCosto = top.flatMap((producto) => {
+    const bajo = lectura.bajoCosto.find((candidato) =>
+      mismoProducto(producto.producto, candidato.producto),
+    );
+    return bajo ? [{ ...producto, codigo: bajo.codigo, nombre: bajo.producto }] : [];
+  });
+  for (const producto of topBajoCosto) {
+    alertas.push({
+      tipo: "VENTA_BAJO_COSTO",
+      severidad: "ALTA",
+      tiendaId,
+      indicador: `TOP_${producto.codigo}`,
+      valorObservado: producto.ventasAprox,
+      valorEsperado: null,
+      mensaje:
+        `${producto.nombre} es el n.º ${producto.posicion} en venta de ${tienda.nombre}` +
+        (producto.ventasAprox
+          ? ` (unos ${Math.round(producto.ventasAprox / 1000)} mil $ en el período)`
+          : "") +
+        ` y se vende a costo o por debajo: es de lo que más sale y cada venta pierde dinero.`,
+    });
+  }
+
+  // Una alerta abierta que ya no se cumple —se recargó un reporte corregido— se retira:
+  // dejarla diría que el producto sigue bajo costo donde ya no lo está. Las de cadena se miran
+  // contra toda la cadena y las del top solo contra esta tienda. Las que alguien revisó o
+  // descartó quedan como constancia.
   await prisma.alerta.deleteMany({
     where: {
       corteId: corte.id,
       tipo: "VENTA_BAJO_COSTO",
       estado: "ABIERTA",
-      indicador: { notIn: deCadena.map((grupo) => grupo.codigo) },
+      OR: [
+        { tiendaId: null, indicador: { notIn: deCadena.map((grupo) => grupo.codigo) } },
+        {
+          tiendaId,
+          indicador: { notIn: topBajoCosto.map((producto) => `TOP_${producto.codigo}`) },
+        },
+      ],
     },
   });
 
