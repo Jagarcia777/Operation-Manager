@@ -6,6 +6,7 @@ const EXTENSIONES: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "text/csv": "csv",
 };
 
 /** Devuelve el documento original de una extracción, que es el respaldo de auditoría. */

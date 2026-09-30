@@ -365,6 +365,14 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
   await sembrarAlertas(prisma, corteActual.id, corteMedio.id, tiendas);
   await sembrarAnalisis(prisma, corteActual, zonaPropia.id);
   await sembrarChecklists(prisma, tiendas, corteActual.id);
+  await sembrarVentaDiaria(
+    prisma,
+    corteActual.fechaFin,
+    // Toda la cadena: el detalle de la zona propia y el agregado de las demás.
+    [...ventas, ...registrosZona]
+      .filter((registro) => registro.corteId === corteActual.id)
+      .reduce((total, registro) => total + (registro.ventasReal ?? 0), 0) / diaHoy,
+  );
 
   return {
     cortes: todos.length,
@@ -383,6 +391,36 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
  * TRUNCATE ... CASCADE en una sola ida a la base, en vez de quince deleteMany encadenados por
  * orden de dependencia: más rápido y sin orden que mantener.
  */
+// ─── Venta diaria ───────────────────────────────────────────────────────────
+
+/**
+ * Peso de cada día en un supermercado venezolano, de domingo a sábado: el fin de semana carga
+ * la compra grande y el martes es el día más flojo. Es lo que el perfil semanal tiene que
+ * descubrir solo a partir de la serie.
+ */
+const FACTOR_DIA = [1.06, 0.88, 0.84, 0.9, 0.93, 1.09, 1.3];
+
+/**
+ * Ocho semanas de venta diaria de la cadena, que terminan el día del corte actual y promedian
+ * lo mismo que su acumulado. Lleva el golpe de quincena y ruido de ±5 % para que el último día
+ * de cada semana no calce exacto con su promedio.
+ */
+async function sembrarVentaDiaria(prisma: PrismaClient, fin: Date, promedioDiario: number) {
+  const mediaFactores = FACTOR_DIA.reduce((total, factor) => total + factor, 0) / 7;
+  const ultimo = Date.UTC(fin.getFullYear(), fin.getMonth(), fin.getDate());
+
+  const data = Array.from({ length: 56 }, (_, atras) => {
+    const fecha = new Date(ultimo - atras * 86_400_000);
+    const quincena = [15, 16, 30, 31, 1].includes(fecha.getUTCDate()) ? 1.07 : 1;
+    const ventas =
+      (promedioDiario * FACTOR_DIA[fecha.getUTCDay()] * quincena * variar(9_000 + atras, 0.05)) /
+      mediaFactores;
+    return { fecha, ventas: redondear(ventas), origen: "MANUAL" };
+  });
+
+  await prisma.ventaDiaria.createMany({ data });
+}
+
 // ─── Eficiencia de la plantilla ─────────────────────────────────────────────
 
 /**

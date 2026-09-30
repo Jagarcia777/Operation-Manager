@@ -17,7 +17,7 @@ si algo queda a medias.
 - [x] `src/lib/calculos.ts`: KPIs derivados, subtotales por zona, total cadena, cumplimiento
 - [x] Administración de zonas, tiendas, cortes, umbrales, perfil y memoria operativa
 - [x] Captura manual por tienda/corte (respaldo sin IA)
-- [ ] Importación CSV con plantilla fija
+- [x] Importación CSV con plantilla fija (pasa por la misma revisión que la lectura con IA)
 
 ## Fase 2 — Ingesta con IA
 
@@ -46,7 +46,7 @@ si algo queda a medias.
 - [x] Análisis con criterio de dirección de operaciones retail
 - [x] Hallazgos con evidencia y causa probable, recomendaciones priorizadas por $
 - [x] Escenarios de cierre y límites explícitos de la data
-- [ ] Crear un plan de acción directamente desde una recomendación
+- [x] Crear un plan de acción directamente desde una recomendación
 
 ## Fase 6 — Documentos de decisión
 
@@ -60,7 +60,7 @@ si algo queda a medias.
       con ajustes y mezcla por categoría, evolución por ritmo diario, Balanced Scorecard
       individual, proyección con exigencia de cierre, plan de acción y conclusiones
 - [x] Exportación de la presentación de tienda a PowerPoint y Word
-- [ ] Venta diaria para el análisis por día de la semana
+- [x] Venta diaria para el análisis por día de la semana
 
 ## Fase 7 — Salir del equipo
 

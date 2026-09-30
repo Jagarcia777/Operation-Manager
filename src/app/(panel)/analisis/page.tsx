@@ -5,7 +5,9 @@ import { listarCortes, resolverCorte } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { hayClaveIA } from "@/lib/extraccion/extraer";
 import { fechaCorta, moneda } from "@/lib/formato";
-import { generarAnalisis } from "./acciones";
+import Link from "next/link";
+import { tituloDePlan } from "@/lib/analisis/plan";
+import { crearPlanDesdeRecomendacion, generarAnalisis } from "./acciones";
 
 const TONO_SEVERIDAD: Record<string, string> = {
   ALTA: "bg-alerta-tenue text-alerta",
@@ -34,6 +36,15 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
   const analisis: AnalisisCorteTipo | null = guardado
     ? (JSON.parse(guardado.contenido) as AnalisisCorteTipo)
     : null;
+
+  // Las recomendaciones que ya tienen plan llevan a él en vez de ofrecer crear otro.
+  const planes = analisis
+    ? await prisma.planAccion.findMany({
+        where: { corteId: corte.id },
+        select: { id: true, titulo: true },
+      })
+    : [];
+  const planPorTitulo = new Map(planes.map((plan) => [plan.titulo, plan.id]));
 
   return (
     <div className="space-y-6">
@@ -120,6 +131,7 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
                     <th className="text-left">Esfuerzo</th>
                     <th className="text-left">Plazo</th>
                     <th className="text-left">Cómo se mide</th>
+                    <th className="no-imprimir" />
                   </tr>
                 </thead>
                 <tbody>
@@ -133,6 +145,24 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
                         {ETIQUETA_PLAZO[recomendacion.plazo] ?? recomendacion.plazo}
                       </td>
                       <td className="max-w-xs text-texto-2">{recomendacion.comoMedirlo}</td>
+                      <td className="no-imprimir text-right whitespace-nowrap">
+                        {planPorTitulo.has(tituloDePlan(recomendacion.accion)) ? (
+                          <Link
+                            href={`/planes/${planPorTitulo.get(tituloDePlan(recomendacion.accion))}`}
+                            className="boton boton-secundario"
+                          >
+                            Ver plan
+                          </Link>
+                        ) : (
+                          <form action={crearPlanDesdeRecomendacion}>
+                            <input type="hidden" name="analisisId" value={guardado!.id} />
+                            <input type="hidden" name="indice" value={indice} />
+                            <button type="submit" className="boton boton-secundario">
+                              Crear plan
+                            </button>
+                          </form>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

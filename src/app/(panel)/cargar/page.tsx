@@ -58,6 +58,7 @@ export default async function CargarPage({ searchParams }: PageProps<"/cargar">)
       <Pestanas
         pestanas={[
           { href: "/cargar", etiqueta: "Leer un documento", activa: true },
+          { href: "/cargar/csv", etiqueta: "Importar CSV", activa: false },
           { href: "/cargar/manual", etiqueta: "Captura manual", activa: false },
         ]}
       />

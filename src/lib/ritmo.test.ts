@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { compararDias, resumirRitmo, type PuntoDiario } from "./ritmo";
+import { compararDias, perfilSemanal, resumirRitmo, type PuntoDiario } from "./ritmo";
 
 /** La serie real del informe del 12/09/2026, del más viejo al más reciente. */
 const SERIE: PuntoDiario[] = [
@@ -75,5 +75,48 @@ describe("resumirRitmo", () => {
     assert.notEqual(resumen.promedio, null);
     assert.equal(resumen.promedioSemanaAnterior, null);
     assert.equal(resumen.variacionSemanal, null);
+  });
+});
+
+describe("perfilSemanal", () => {
+  /** Tres semanas idénticas: el sábado vende el doble que el resto. */
+  const serieTipica = (ultimoSabado: number): PuntoDiario[] =>
+    Array.from({ length: 21 }, (_, dia) => {
+      const fecha = new Date(Date.UTC(2026, 8, 6 + dia)); // del domingo 6 al sábado 26
+      const esUltimo = dia === 20;
+      const base = fecha.getUTCDay() === 6 ? 2000 : 1000;
+      return { fecha, ventas: esUltimo ? ultimoSabado : base };
+    });
+
+  it("reparte la semana típica y ordena de lunes a domingo", () => {
+    const perfil = perfilSemanal(serieTipica(2000))!;
+    assert.equal(perfil.dias[0].diaSemana, "lunes");
+    assert.equal(perfil.dias[6].diaSemana, "domingo");
+    const sabado = perfil.dias[5];
+    assert.equal(sabado.diaSemana, "sábado");
+    assert.equal(sabado.pesoSemana, 25); // 2000 de 8000
+    assert.equal(sabado.indiceSemana, 175); // 2000 contra un día típico de 8000 / 7
+    const total = perfil.dias.reduce((suma, dia) => suma + dia.pesoSemana!, 0);
+    assert.ok(Math.abs(total - 100) < 1e-9);
+  });
+
+  it("juzga el último día contra su promedio sin incluirse en él", () => {
+    const perfil = perfilSemanal(serieTipica(1500))!;
+    const sabado = perfil.dias[5];
+    assert.equal(sabado.promedio, 2000);
+    assert.equal(sabado.ultimo?.ventas, 1500);
+    assert.equal(sabado.ultimo?.variacion, -25);
+  });
+
+  it("con una sola semana no hay perfil", () => {
+    assert.equal(perfilSemanal(serieTipica(2000).slice(-7)), null);
+    assert.equal(perfilSemanal([]), null);
+  });
+
+  it("funciona con la serie real del informe", () => {
+    const perfil = perfilSemanal(SERIE);
+    assert.ok(perfil);
+    // Quince días: el sábado aparece tres veces y el resto dos, así que todos tienen promedio.
+    assert.ok(perfil.dias.every((dia) => dia.observaciones >= 1));
   });
 });

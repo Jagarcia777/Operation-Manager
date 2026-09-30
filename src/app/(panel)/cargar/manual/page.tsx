@@ -46,6 +46,7 @@ export default async function CapturaManualPage({ searchParams }: PageProps<"/ca
       <Pestanas
         pestanas={[
           { href: "/cargar", etiqueta: "Leer un documento", activa: false },
+          { href: `/cargar/csv?corte=${corte.id}`, etiqueta: "Importar CSV", activa: false },
           { href: `/cargar/manual?corte=${corte.id}`, etiqueta: "Captura manual", activa: true },
         ]}
       />

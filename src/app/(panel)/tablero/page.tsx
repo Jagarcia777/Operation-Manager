@@ -18,7 +18,7 @@ import {
 import { prisma } from "@/lib/db";
 import { asp } from "@/lib/documentos/indicadores";
 import { ETIQUETA_ESTADO_CORTE, type EstadoCorte } from "@/lib/dominio";
-import { resumirRitmo } from "@/lib/ritmo";
+import { perfilSemanal, resumirRitmo } from "@/lib/ritmo";
 import {
   CLASES_TONO,
   fechaCorta,
@@ -75,9 +75,11 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
     cargarTablero(corte.id),
     prisma.benchmark.findMany(),
     vista === "evolucion" ? comparativaMensual(6) : Promise.resolve(null),
-    vista === "ritmo" ? cargarSerieDiaria(30) : Promise.resolve([]),
+    // Ocho semanas: las dos últimas para el ritmo y todas para el perfil por día de la semana.
+    vista === "ritmo" ? cargarSerieDiaria(56) : Promise.resolve([]),
   ]);
   const ritmo = resumirRitmo(serie);
+  const perfil = perfilSemanal(serie);
   const { total } = tablero;
 
   // La zona propia es la que se gestiona; el total de cadena es escala, no desempeño.
@@ -167,7 +169,7 @@ export default async function TableroPage({ searchParams }: PageProps<"/tablero"
 
       {vista === "ritmo" ? (
         ritmo.dias.length ? (
-          <RitmoDiario ritmo={ritmo} />
+          <RitmoDiario ritmo={ritmo} perfil={perfil} />
         ) : (
           <EstadoVacio mensaje="Todavía no hay serie diaria. La carga el Resumen Ejecutivo de la cadena, que trae los comparativos de siete días." />
         )
