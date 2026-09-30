@@ -14,7 +14,14 @@ import {
   extraerVentas,
 } from "@/lib/extraccion/extraer";
 import type { ExtraccionResumenEjecutivoTipo } from "@/lib/extraccion/esquemas";
+import {
+  esReporteCategoriasTienda,
+  leerCategoriasTienda,
+  type LecturaCategoriasTienda,
+} from "@/lib/extraccion/categoriasTienda";
+import { guardarCategoriasTienda } from "@/lib/extraccion/guardarCategorias";
 import { guardarResumenEjecutivo } from "@/lib/extraccion/resumen";
+import { textoDePdf } from "@/lib/extraccion/textoPdf";
 import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
 
 
@@ -60,36 +67,85 @@ export async function importarCsv(formData: FormData) {
   redirect(`/cargar/${extraccion.id}`);
 }
 
+/** Marca de las cargas leídas del texto del PDF, sin IA. */
+const MODELO_LECTOR_PDF = "LECTOR_PDF";
+
+/**
+ * Sube uno o varios documentos. Antes de gastar una lectura con IA se mira si el PDF es un
+ * reporte que la aplicación sabe leer por su texto —el de ventas por categoría de una tienda—:
+ * ese se lee directo, exacto, sin costo y aunque no haya clave de IA. Así se pueden subir los
+ * seis reportes de la zona de una vez.
+ */
 export async function subirYExtraer(formData: FormData) {
   const corteId = String(formData.get("corteId") ?? "");
   const destino = String(formData.get("destino") ?? "VENTAS");
-  const archivo = formData.get("archivo");
-
-  // El Resumen Ejecutivo trae su propia fecha y crea sus dos cortes —el día y el acumulado del
-  // mes—, así que es el único documento que no se carga contra un corte ya existente.
-  const creaSuCorte = destino === "RESUMEN";
+  const archivos = formData
+    .getAll("archivo")
+    .filter((archivo): archivo is File => archivo instanceof File && archivo.size > 0);
 
   // Se responde con un mensaje en la pantalla, no con una excepción: un error de servidor
   // llega al navegador como "Application error" y un archivo equivocado no merece eso.
-  if ((!corteId && !creaSuCorte) || !(archivo instanceof File) || archivo.size === 0) {
-    redirect("/cargar?error=falta");
-  }
-  if (!TIPOS_ACEPTADOS[archivo.type]) {
-    redirect("/cargar?error=tipo");
-  }
-  if (archivo.size > TAMANO_MAXIMO) {
+  if (!archivos.length) redirect("/cargar?error=falta");
+  if (archivos.some((archivo) => !TIPOS_ACEPTADOS[archivo.type])) redirect("/cargar?error=tipo");
+  if (archivos.reduce((total, archivo) => total + archivo.size, 0) > TAMANO_MAXIMO) {
     redirect("/cargar?error=peso");
   }
 
+  const creadas: string[] = [];
+  for (const archivo of archivos) {
+    creadas.push(await leerArchivo(archivo, destino, corteId, archivos.length === 1));
+  }
+
+  revalidatePath("/cargar");
+  redirect(creadas.length === 1 ? `/cargar/${creadas[0]}` : "/cargar");
+}
+
+async function leerArchivo(archivo: File, destino: string, corteId: string, unico: boolean) {
   const buffer = Buffer.from(await archivo.arrayBuffer());
+  const base = {
+    archivoNombre: archivo.name,
+    archivoTipo: archivo.type,
+    archivoContenido: buffer,
+  };
+
+  if (archivo.type === "application/pdf") {
+    const texto = await textoDePdf(buffer);
+    if (esReporteCategoriasTienda(texto)) {
+      // El reporte trae su período y crea o encuentra su corte al confirmarlo.
+      const extraccion = await prisma.extraccion.create({
+        data: {
+          ...base,
+          destino: "CATEGORIAS",
+          estado: "EXTRAIDO",
+          modelo: MODELO_LECTOR_PDF,
+          respuestaCruda: JSON.stringify(leerCategoriasTienda(texto)),
+        },
+      });
+      return extraccion.id;
+    }
+  }
+
+  // El Resumen Ejecutivo trae su propia fecha y crea sus dos cortes —el día y el acumulado del
+  // mes—; los demás documentos se cargan contra un corte ya existente.
+  const creaSuCorte = destino === "RESUMEN";
+  if (!corteId && !creaSuCorte) {
+    if (unico) redirect("/cargar?error=falta");
+    const extraccion = await prisma.extraccion.create({
+      data: {
+        ...base,
+        destino,
+        estado: "ERROR",
+        error: "Este documento se carga contra un corte: súbelo solo y elige el corte.",
+      },
+    });
+    return extraccion.id;
+  }
 
   const extraccion = await prisma.extraccion.create({
     data: {
+      ...base,
       corteId: creaSuCorte ? null : corteId,
       destino,
-      archivoNombre: archivo.name,
-      archivoTipo: archivo.type,
-      archivoContenido: buffer,
       estado: "PENDIENTE",
       modelo: MODELO,
     },
@@ -118,8 +174,7 @@ export async function subirYExtraer(formData: FormData) {
     });
   }
 
-  revalidatePath("/cargar");
-  redirect(`/cargar/${extraccion.id}`);
+  return extraccion.id;
 }
 
 function aNumero(valor: FormDataEntryValue | null): number | null {
@@ -145,6 +200,9 @@ export async function confirmarExtraccion(formData: FormData) {
 
   if (extraccion.destino === "RESUMEN") {
     return confirmarResumen(extraccion.id, extraccion.respuestaCruda);
+  }
+  if (extraccion.destino === "CATEGORIAS") {
+    return confirmarCategorias(extraccion.id, extraccion.respuestaCruda, formData);
   }
   if (!extraccion.corteId) throw new Error("La extracción no tiene corte asociado.");
 
@@ -339,4 +397,37 @@ async function confirmarResumen(extraccionId: string, respuestaCruda: string | n
 
   revalidatePath("/", "layout");
   redirect(`/tablero?corte=${resultado.corteMesId}`);
+}
+
+async function confirmarCategorias(
+  extraccionId: string,
+  respuestaCruda: string | null,
+  formData: FormData,
+) {
+  if (!respuestaCruda) throw new Error("La lectura del documento está vacía.");
+  const tiendaId = String(formData.get("tiendaId") ?? "");
+  if (!tiendaId) redirect(`/cargar/${extraccionId}?error=tienda`);
+
+  const lectura = JSON.parse(respuestaCruda) as LecturaCategoriasTienda;
+  const resultado = await guardarCategoriasTienda(prisma, lectura, tiendaId);
+
+  await prisma.extraccion.update({
+    where: { id: extraccionId },
+    data: { estado: "CONFIRMADO", corteId: resultado.corteId },
+  });
+  await sincronizarAlertas(resultado.corteId);
+
+  revalidatePath("/", "layout");
+
+  // Con varios reportes subidos de una vez, al confirmar uno se pasa directo al siguiente.
+  const siguiente = await prisma.extraccion.findFirst({
+    where: { destino: "CATEGORIAS", estado: "EXTRAIDO" },
+    orderBy: { creadaEn: "asc" },
+    select: { id: true },
+  });
+  redirect(
+    siguiente
+      ? `/cargar/${siguiente.id}`
+      : `/categorias?corte=${resultado.corteId}&tienda=${tiendaId}`,
+  );
 }

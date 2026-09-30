@@ -76,6 +76,7 @@ export const TIPOS_ALERTA = [
   "HORAS_DESCUADRADAS",
   "ESTANDAR_DESCALIBRADO",
   "INDICADOR_NO_CUADRA",
+  "VENTA_BAJO_COSTO",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
@@ -87,6 +88,7 @@ export const ETIQUETA_TIPO_ALERTA: Record<TipoAlerta, string> = {
   HORAS_DESCUADRADAS: "Horas que no cuadran",
   ESTANDAR_DESCALIBRADO: "Estándar fuera de escala",
   INDICADOR_NO_CUADRA: "Indicador impreso no cuadra",
+  VENTA_BAJO_COSTO: "Vendido a costo o por debajo",
 };
 
 export const SEVERIDADES = ["ALTA", "MEDIA", "BAJA"] as const;
@@ -117,7 +119,8 @@ export type UnidadMeta = (typeof UNIDADES_META)[number];
 export const ESTADOS_HITO = ["PENDIENTE", "EN_CURSO", "COMPLETADO"] as const;
 export type EstadoHito = (typeof ESTADOS_HITO)[number];
 
-export const ORIGENES_DATO = ["MANUAL", "CSV", "IA"] as const;
+// PDF: leído directamente del texto del documento, sin IA.
+export const ORIGENES_DATO = ["MANUAL", "CSV", "IA", "PDF"] as const;
 export type OrigenDato = (typeof ORIGENES_DATO)[number];
 
 export const ESTADOS_EXTRACCION = [
@@ -128,12 +131,13 @@ export const ESTADOS_EXTRACCION = [
 ] as const;
 export type EstadoExtraccion = (typeof ESTADOS_EXTRACCION)[number];
 
-export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES", "RESUMEN"] as const;
+export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES", "RESUMEN", "CATEGORIAS"] as const;
 export type DestinoExtraccion = (typeof DESTINOS_EXTRACCION)[number];
 export const ETIQUETA_DESTINO: Record<DestinoExtraccion, string> = {
   VENTAS: "Tablero de ventas por tienda",
   AJUSTES: "Ajustes por tipología",
   RESUMEN: "Resumen Ejecutivo de la cadena",
+  CATEGORIAS: "Ventas por categoría de una tienda",
 };
 
 // ─── Checklists de operación ────────────────────────────────────────────────

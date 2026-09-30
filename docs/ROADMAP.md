@@ -119,6 +119,17 @@ si algo queda a medias.
 - [x] Mezcla por categoría de cadena, top de productos y serie diaria
 - [x] Ritmo diario: semana contra semana, que es lo que el informe no dice
 
+## Fase 14 — Reportes por tienda
+
+- [x] Reporte de ventas por categoría de cada tienda leído directo del PDF, sin IA
+- [x] Varios reportes en una sola subida, con la tienda y el corte deducidos del documento
+- [x] Margen acumulado por tienda, que el Resumen Ejecutivo no publica
+- [x] «% Venta» impreso contra el derivado: se dice una vez por corte
+- [x] Productos vendidos a costo o por debajo, con alerta de cadena desde tres tiendas
+- [ ] Ajustes por categoría, tipologías Donación / Mercadeo / Hurto y ajuste en unidades
+      (esperan los PDF de ajustes originales; el libro de junio divide unidades entre dólares)
+- [ ] Top 10 de productos por tienda
+
 ## Pendiente del lado del usuario
 
 No son tareas de código: la aplicación ya las admite desde Configuración.

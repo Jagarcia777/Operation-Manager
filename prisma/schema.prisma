@@ -88,6 +88,7 @@ model Tienda {
   notas        NotaMemoria[]
   inspecciones Inspeccion[]
   plantilla    RegistroPlantilla[]
+  bajoCosto    ProductoBajoCosto[]
 
   @@index([zonaId])
 }
@@ -115,6 +116,7 @@ model Corte {
   inspecciones  Inspeccion[]
   plantilla     RegistroPlantilla[]
   productos     RegistroProducto[]
+  bajoCosto     ProductoBajoCosto[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -174,6 +176,25 @@ model VentaDiaria {
 
   origen        String   @default("IA")
   actualizadoEn DateTime @updatedAt
+}
+
+// Productos que una tienda vendió a costo o por debajo en el período, tal como los lista el
+// reporte de ventas por categoría. Se guarda por tienda para ver cuándo el mismo producto se
+// repite en varias: eso ya no es un problema de la tienda sino un precio mal puesto en la cadena.
+model ProductoBajoCosto {
+  id       String @id @default(cuid())
+  corteId  String
+  tiendaId String
+  corte    Corte  @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda   Tienda @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  codigo   String // código de barra o interno, como lo imprime el reporte
+  producto String
+
+  origen   String   @default("PDF")
+  creadoEn DateTime @default(now())
+
+  @@unique([corteId, tiendaId, codigo])
+  @@index([corteId, codigo])
 }
 
 // Productos del top de rotación que publica el informe. No es un catálogo maestro: son los que

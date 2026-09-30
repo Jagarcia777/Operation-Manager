@@ -2,7 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { metaDeclarada } from "@/lib/carga";
 import type { AlertaDetectada } from "@/lib/validacion";
 import { conciliarIndicadores, type Conciliacion } from "./conciliar";
-import { emparejarTienda, normalizar } from "./emparejar";
+import { emparejarTienda, indiceDeCategorias, normalizar } from "./emparejar";
 import type { ExtraccionResumenEjecutivoTipo } from "./esquemas";
 
 // Guarda el Resumen Ejecutivo de la cadena. Un solo archivo alimenta dos cortes —el día y el
@@ -45,7 +45,7 @@ function fechaDelInforme(texto: string | null): Date {
 
 const dosDigitos = (valor: number) => String(valor).padStart(2, "0");
 
-function etiquetaFecha(fecha: Date) {
+export function etiquetaFecha(fecha: Date) {
   return `${dosDigitos(fecha.getUTCDate())}/${dosDigitos(fecha.getUTCMonth() + 1)}/${fecha.getUTCFullYear()}`;
 }
 
@@ -184,14 +184,7 @@ export async function guardarResumenEjecutivo(
   // Van sin tienda porque el informe publica la mezcla consolidada. Se reemplaza el juego
   // completo en cada carga: sin índice único que las proteja (en Postgres dos NULL no chocan),
   // borrar y volver a escribir es lo único que garantiza que no se dupliquen.
-  const categoriasCatalogo = await prisma.categoria.findMany();
-  const porNombre = new Map<string, { id: string }>();
-  for (const categoria of categoriasCatalogo) {
-    porNombre.set(normalizar(categoria.nombre), categoria);
-    for (const alias of (categoria.alias ?? "").split(/[\n,;]/)) {
-      if (alias.trim()) porNombre.set(normalizar(alias), categoria);
-    }
-  }
+  const porNombre = indiceDeCategorias(await prisma.categoria.findMany());
 
   await prisma.registroCategoria.deleteMany({ where: { corteId: dia.id, tiendaId: null } });
 

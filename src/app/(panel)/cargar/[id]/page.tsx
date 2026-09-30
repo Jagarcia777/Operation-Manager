@@ -4,7 +4,9 @@ import { EstadoVacio } from "@/components/EstadoVacio";
 import { cargarTiendas } from "@/lib/consultas";
 import { prisma } from "@/lib/db";
 import { emparejarTienda } from "@/lib/extraccion/emparejar";
+import type { LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
 import type { ExtraccionResumenEjecutivoTipo } from "@/lib/extraccion/esquemas";
+import { RevisarCategorias } from "./RevisarCategorias";
 import { RevisarResumen } from "./RevisarResumen";
 import { moneda } from "@/lib/formato";
 import { confirmarExtraccion } from "../acciones";
@@ -36,8 +38,12 @@ type LecturaVentas = {
   unidad?: string;
 };
 
-export default async function RevisarExtraccionPage({ params }: PageProps<"/cargar/[id]">) {
+export default async function RevisarExtraccionPage({
+  params,
+  searchParams,
+}: PageProps<"/cargar/[id]">) {
   const { id } = await params;
+  const { error } = await searchParams;
   const extraccion = await prisma.extraccion.findUnique({
     where: { id },
     include: { corte: true },
@@ -69,6 +75,18 @@ export default async function RevisarExtraccionPage({ params }: PageProps<"/carg
     codigo: tienda.codigo,
     alias: tienda.alias,
   }));
+
+  if (extraccion.destino === "CATEGORIAS") {
+    return (
+      <RevisarCategorias
+        extraccionId={extraccion.id}
+        archivoNombre={extraccion.archivoNombre}
+        lectura={JSON.parse(extraccion.respuestaCruda) as LecturaCategoriasTienda}
+        catalogo={catalogo}
+        error={typeof error === "string" ? error : null}
+      />
+    );
+  }
 
   if (extraccion.destino === "RESUMEN") {
     const resumen = JSON.parse(extraccion.respuestaCruda) as ExtraccionResumenEjecutivoTipo;
