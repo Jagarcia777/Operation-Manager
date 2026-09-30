@@ -13,7 +13,11 @@ export const TIPOS_ACEPTADOS: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  // Solo el libro de ajustes vs ventas, que se lee directo; no pasa por la IA.
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
 };
+
+export const TIPO_EXCEL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export const ACEPTA = Object.keys(TIPOS_ACEPTADOS).join(",");
 

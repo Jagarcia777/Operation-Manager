@@ -7,7 +7,8 @@ import { GraficoComposicion } from "@/components/graficos/GraficoComposicion";
 import type { FilaAjustes } from "@/lib/calculos";
 import { cargarAjustes, listarCortes, resolverCorte } from "@/lib/consultas";
 import { ETIQUETA_TIPOLOGIA, TIPOLOGIAS } from "@/lib/dominio";
-import { moneda, porcentaje } from "@/lib/formato";
+import { prisma } from "@/lib/db";
+import { moneda, numero, porcentaje } from "@/lib/formato";
 
 type Resumen = Omit<FilaAjustes, "tiendaId" | "tienda">;
 
@@ -19,10 +20,44 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
   const [cortes, corte] = await Promise.all([listarCortes(), resolverCorte(corteId)]);
   if (!corte) return <EstadoVacio mensaje="No hay cortes cargados todavía." />;
 
-  const ajustes = await cargarAjustes(corte.id);
+  const [ajustes, referencias, porCategoria, unidadesDeLaZona] = await Promise.all([
+    cargarAjustes(corte.id),
+    prisma.ajusteReferencia.findMany({ where: { corteId: corte.id } }),
+    prisma.registroAjusteCategoria.findMany({
+      where: { corteId: corte.id },
+      include: {
+        categoria: { select: { nombre: true } },
+        tienda: { select: { nombre: true, zona: { select: { detallada: true } } } },
+      },
+    }),
+    prisma.registroAjuste.aggregate({
+      _sum: { unidades: true },
+      where: { corteId: corte.id, tienda: { zona: { detallada: true } } },
+    }),
+  ]);
+
+  // Ocho tipologías en columnas vacías no dicen nada: se muestran las que tienen dato en el
+  // corte, y las cinco de siempre si todavía no hay ninguna.
+  const conDato = TIPOLOGIAS.filter((tipologia) => ajustes.total.montos[tipologia] !== null);
+  const tipologias = conDato.length ? conDato : TIPOLOGIAS.slice(0, 5);
+
+  const cadena = referencias.find(
+    (referencia) => referencia.ambito === "CADENA" && referencia.tipologia === "TOTAL",
+  );
+  // Primero el centro que abastece a la zona: es el que suma a su costo.
+  const centros = referencias
+    .filter((referencia) => referencia.ambito === "CENTRO_DISTRIBUCION")
+    .sort((a, b) => Number(Boolean(b.zonaId)) - Number(Boolean(a.zonaId)));
+  // Una zona sin ningún ajuste cargado son filas de guiones: se omite, y el total deja de
+  // llamarse "de la cadena" porque ya no lo es. La cadena, si llegó, va en su tarjeta.
+  const zonasConDato = ajustes.zonas.filter((zona) => zona.subtotal.totalMonto !== null);
+  const zonasVisibles = zonasConDato.length ? zonasConDato : ajustes.zonas;
+  const etiquetaTotal =
+    zonasVisibles.length < ajustes.zonas.length ? "Total de lo cargado" : "Total cadena";
+  const unidadesZona = unidadesDeLaZona._sum.unidades;
 
   const columnas: ColumnaTabla<FilaAjustes, Resumen>[] = [
-    ...TIPOLOGIAS.map((tipologia) => ({
+    ...tipologias.map((tipologia) => ({
       titulo: ETIQUETA_TIPOLOGIA[tipologia],
       numerica: true,
       celda: (fila: FilaAjustes) =>
@@ -46,7 +81,7 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
 
   // Los ajustes vienen en negativo por ser en contra, así que el de mayor impacto es el de
   // mayor magnitud: ordenar por el número con signo coronaba a la única tipología a favor.
-  const mayor = TIPOLOGIAS.map((tipologia) => ({
+  const mayor = tipologias.map((tipologia) => ({
     tipologia,
     monto: ajustes.total.montos[tipologia] ?? 0,
   })).sort((a, b) => Math.abs(b.monto) - Math.abs(a.monto))[0];
@@ -80,12 +115,31 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
           valor={moneda(ajustes.total.ventasReal)}
           detalle="Base de todos los porcentajes"
         />
+        {cadena?.monto != null && cadena.ventas ? (
+          <TarjetaKpi
+            etiqueta="Toda la cadena"
+            valor={porcentaje((cadena.monto / cadena.ventas) * 100, 2)}
+            detalle={`${moneda(cadena.monto)} sobre ${moneda(cadena.ventas)} de venta`}
+          />
+        ) : null}
+        {centros.map((centro) => (
+          <TarjetaKpi
+            key={centro.id}
+            etiqueta={`Centro de distribución · ${centro.nombre}`}
+            valor={`${numero(centro.unidades)} unid.`}
+            detalle={
+              centro.zonaId && unidadesZona
+                ? `Abastece a la zona; sus tiendas ajustaron ${numero(unidadesZona)} unid. en total`
+                : "Ajusta inventario sin vender: no entra en el % sobre ventas"
+            }
+          />
+        ))}
       </section>
 
       <section className="tarjeta p-4">
         <h2 className="mb-3 text-sm font-semibold">En qué se va el ajuste</h2>
         <GraficoComposicion
-          porciones={TIPOLOGIAS.map((tipologia) => ({
+          porciones={tipologias.map((tipologia) => ({
             etiqueta: ETIQUETA_TIPOLOGIA[tipologia],
             valor: ajustes.total.montos[tipologia] ?? 0,
           }))}
@@ -103,7 +157,133 @@ export default async function AjustesPage({ searchParams }: PageProps<"/ajustes"
         }))}
       />
 
-      <TablaZonas zonas={ajustes.zonas} total={ajustes.total} columnas={columnas} />
+      <TablaZonas
+        zonas={zonasVisibles}
+        total={ajustes.total}
+        columnas={columnas}
+        etiquetaTotal={etiquetaTotal}
+      />
+
+      <AjustePorCategoria registros={porCategoria} />
     </div>
+  );
+}
+
+type RegistroCategoria = {
+  tiendaId: string | null;
+  ventas: number | null;
+  monto: number | null;
+  categoria: { nombre: string };
+  tienda: { nombre: string; zona: { detallada: boolean } } | null;
+};
+
+const sobre = (parte: number, base: number) => (base ? (parte / base) * 100 : null);
+
+/**
+ * Dónde se pierde el dinero: el ajuste de cada categoría contra su propia venta, en la zona y
+ * en la cadena, y las tres categorías que más pesan abiertas por tienda. Es lo que convierte
+ * "la merma está alta" en "productos del campo en Valle de la Pascua".
+ */
+function AjustePorCategoria({ registros }: { registros: RegistroCategoria[] }) {
+  const deZona = registros.filter((registro) => registro.tienda?.zona.detallada);
+  if (!deZona.length) return null;
+
+  const agrupar = (lista: RegistroCategoria[]) => {
+    const mapa = new Map<string, { ventas: number; monto: number }>();
+    for (const registro of lista) {
+      const actual = mapa.get(registro.categoria.nombre) ?? { ventas: 0, monto: 0 };
+      actual.ventas += registro.ventas ?? 0;
+      actual.monto += registro.monto ?? 0;
+      mapa.set(registro.categoria.nombre, actual);
+    }
+    return mapa;
+  };
+  const zona = agrupar(deZona);
+  const cadena = agrupar(registros.filter((registro) => registro.tiendaId === null));
+  const totalZona = [...zona.values()].reduce((total, fila) => total + fila.monto, 0);
+  const filas = [...zona].filter(([, valores]) => valores.monto).sort((a, b) => a[1].monto - b[1].monto);
+  const principales = filas.slice(0, 3).map(([nombre]) => nombre);
+  const tiendas = [...new Set(deZona.map((registro) => registro.tienda!.nombre))];
+  const celda = (tienda: string, categoria: string) => {
+    const registro = deZona.find(
+      (fila) => fila.tienda!.nombre === tienda && fila.categoria.nombre === categoria,
+    );
+    return registro ? sobre(registro.monto ?? 0, registro.ventas ?? 0) : null;
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="tarjeta overflow-x-auto">
+        <div className="px-5 pt-5 pb-3">
+          <h2 className="text-base font-semibold tracking-[-0.02em]">Ajuste por categoría</h2>
+          <p className="mt-1 text-sm text-texto-3">
+            Dólares ajustados contra la venta de la propia categoría.
+          </p>
+        </div>
+        <table className="tabla min-w-[560px]">
+          <thead>
+            <tr>
+              <th className="text-left">Categoría</th>
+              <th>Ajuste · zona</th>
+              <th>Peso</th>
+              <th>% de su venta</th>
+              <th>Cadena</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map(([nombre, valores]) => {
+              const deCadena = cadena.get(nombre);
+              return (
+                <tr key={nombre}>
+                  <td className="text-left">{nombre}</td>
+                  <td>{moneda(valores.monto)}</td>
+                  <td className="text-texto-2">{porcentaje(sobre(valores.monto, totalZona))}</td>
+                  <td className="font-medium">{porcentaje(sobre(valores.monto, valores.ventas), 2)}</td>
+                  <td className="text-texto-2">
+                    {deCadena ? porcentaje(sobre(deCadena.monto, deCadena.ventas), 2) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="tarjeta overflow-x-auto">
+        <div className="px-5 pt-5 pb-3">
+          <h2 className="text-base font-semibold tracking-[-0.02em]">
+            Las que más pesan, por tienda
+          </h2>
+          <p className="mt-1 text-sm text-texto-3">% de la venta de la categoría que se ajustó.</p>
+        </div>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th className="text-left">Tienda</th>
+              {principales.map((nombre) => (
+                <th key={nombre}>{nombre.toLowerCase()}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tiendas.map((tienda) => (
+              <tr key={tienda}>
+                <td className="text-left">{tienda}</td>
+                {principales.map((nombre) => {
+                  const valor = celda(tienda, nombre);
+                  const referencia = sobre(zona.get(nombre)!.monto, zona.get(nombre)!.ventas);
+                  const peor = valor !== null && referencia !== null && Math.abs(valor) > Math.abs(referencia) * 1.5;
+                  return (
+                    <td key={nombre} className={peor ? "font-medium text-alerta" : ""}>
+                      {porcentaje(valor, 2)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

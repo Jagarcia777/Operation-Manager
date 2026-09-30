@@ -126,8 +126,11 @@ si algo queda a medias.
 - [x] Margen acumulado por tienda, que el Resumen Ejecutivo no publica
 - [x] «% Venta» impreso contra el derivado: se dice una vez por corte
 - [x] Productos vendidos a costo o por debajo, con alerta de cadena desde tres tiendas
-- [ ] Ajustes por categoría, tipologías Donación / Mercadeo / Hurto y ajuste en unidades
-      (esperan los PDF de ajustes originales; el libro de junio divide unidades entre dólares)
+- [x] Libro de ajustes vs ventas (Excel) leído sin IA: solo cifras base, los % se derivan
+- [x] Tipologías Donación, Mercadeo y Hurto; ajuste en unidades junto al monto en USD
+- [x] Ajuste por categoría de cada tienda y de la cadena, contra la venta de la categoría
+- [x] Cadena como línea de comparación y CENDI Timote como centro que abastece a Oriente
+- [x] Venta del libro contrastada con el ritmo conocido: detecta un período que no cuadra
 - [ ] Top 10 de productos por tienda
 
 ## Pendiente del lado del usuario

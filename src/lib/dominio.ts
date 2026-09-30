@@ -25,6 +25,9 @@ export const TIPOLOGIAS = [
   "CARGA_DESCARGA",
   "INVENTARIO",
   "VENTAS",
+  "DONACION",
+  "MERCADEO",
+  "HURTO",
 ] as const;
 export type Tipologia = (typeof TIPOLOGIAS)[number];
 export const ETIQUETA_TIPOLOGIA: Record<Tipologia, string> = {
@@ -33,6 +36,9 @@ export const ETIQUETA_TIPOLOGIA: Record<Tipologia, string> = {
   CARGA_DESCARGA: "Carga y Descarga",
   INVENTARIO: "Inventario",
   VENTAS: "Ventas",
+  DONACION: "Donación",
+  MERCADEO: "Mercadeo",
+  HURTO: "Hurto",
 };
 
 export const INDICADORES = [
@@ -120,7 +126,8 @@ export const ESTADOS_HITO = ["PENDIENTE", "EN_CURSO", "COMPLETADO"] as const;
 export type EstadoHito = (typeof ESTADOS_HITO)[number];
 
 // PDF: leído directamente del texto del documento, sin IA.
-export const ORIGENES_DATO = ["MANUAL", "CSV", "IA", "PDF"] as const;
+// XLSX: leído de un libro de Excel con formato conocido.
+export const ORIGENES_DATO = ["MANUAL", "CSV", "IA", "PDF", "XLSX"] as const;
 export type OrigenDato = (typeof ORIGENES_DATO)[number];
 
 export const ESTADOS_EXTRACCION = [
@@ -131,13 +138,20 @@ export const ESTADOS_EXTRACCION = [
 ] as const;
 export type EstadoExtraccion = (typeof ESTADOS_EXTRACCION)[number];
 
-export const DESTINOS_EXTRACCION = ["VENTAS", "AJUSTES", "RESUMEN", "CATEGORIAS"] as const;
+export const DESTINOS_EXTRACCION = [
+  "VENTAS",
+  "AJUSTES",
+  "RESUMEN",
+  "CATEGORIAS",
+  "LIBRO_AJUSTES",
+] as const;
 export type DestinoExtraccion = (typeof DESTINOS_EXTRACCION)[number];
 export const ETIQUETA_DESTINO: Record<DestinoExtraccion, string> = {
   VENTAS: "Tablero de ventas por tienda",
   AJUSTES: "Ajustes por tipología",
   RESUMEN: "Resumen Ejecutivo de la cadena",
   CATEGORIAS: "Ventas por categoría de una tienda",
+  LIBRO_AJUSTES: "Libro de ajustes vs ventas (Excel)",
 };
 
 // ─── Checklists de operación ────────────────────────────────────────────────

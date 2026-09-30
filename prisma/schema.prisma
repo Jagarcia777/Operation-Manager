@@ -28,6 +28,7 @@ model Zona {
   planes    PlanAccion[]
   notas     NotaMemoria[]
   perfiles  Perfil[]
+  ajustesReferencia AjusteReferencia[]
 }
 
 // Cifras agregadas de una zona que no se gestiona al detalle. Aquí sí se captura el total,
@@ -89,6 +90,7 @@ model Tienda {
   inspecciones Inspeccion[]
   plantilla    RegistroPlantilla[]
   bajoCosto    ProductoBajoCosto[]
+  ajustesCategoria RegistroAjusteCategoria[]
 
   @@index([zonaId])
 }
@@ -117,6 +119,8 @@ model Corte {
   plantilla     RegistroPlantilla[]
   productos     RegistroProducto[]
   bajoCosto     ProductoBajoCosto[]
+  ajustesCategoria  RegistroAjusteCategoria[]
+  ajustesReferencia AjusteReferencia[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -178,6 +182,55 @@ model VentaDiaria {
   actualizadoEn DateTime @updatedAt
 }
 
+// Ajuste de inventario por categoría. Es lo que dice dónde se pierde el dinero: en la cadena,
+// productos del campo y cárnicos concentran casi nueve de cada diez dólares ajustados. Lleva
+// la venta de la categoría en el mismo período porque el ajuste se mide contra ella, y el
+// reporte de ajustes no siempre coincide en fechas con los de venta. Sin tienda es el
+// consolidado de toda la cadena, que se reemplaza completo en cada carga.
+model RegistroAjusteCategoria {
+  id          String    @id @default(cuid())
+  corteId     String
+  tiendaId    String?
+  categoriaId String
+  corte       Corte     @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda      Tienda?   @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  ventas   Float?
+  unidades Float?
+  monto    Float? // USD a costo, con el signo de la fuente
+
+  origen        String   @default("XLSX")
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([corteId, tiendaId, categoriaId])
+  @@index([categoriaId])
+}
+
+// Ajustes que no son de una tienda de la zona pero sirven para leerlos: el total de la cadena
+// —la línea de comparación— y los centros de distribución, que ajustan inventario sin vender.
+// CENDI Timote abastece a Zona Oriente: su merma es parte del costo de la zona aunque no
+// aparezca en ninguna tienda. tipologia "TOTAL" es la fila sin abrir.
+model AjusteReferencia {
+  id        String  @id @default(cuid())
+  corteId   String
+  corte     Corte   @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  ambito    String // CADENA | CENTRO_DISTRIBUCION
+  nombre    String
+  zonaId    String? // zona que abastece el centro de distribución
+  zona      Zona?   @relation(fields: [zonaId], references: [id], onDelete: SetNull)
+  tipologia String  @default("TOTAL")
+
+  ventas   Float?
+  unidades Float?
+  monto    Float?
+
+  origen   String   @default("XLSX")
+  creadoEn DateTime @default(now())
+
+  @@unique([corteId, ambito, nombre, tipologia])
+}
+
 // Productos que una tienda vendió a costo o por debajo en el período, tal como los lista el
 // reporte de ventas por categoría. Se guarda por tienda para ver cuándo el mismo producto se
 // repite en varias: eso ya no es un problema de la tienda sino un precio mal puesto en la cadena.
@@ -235,7 +288,10 @@ model RegistroAjuste {
 
   // MERMA | MERCANCIA_DANADA | CARGA_DESCARGA | INVENTARIO | ERRORES_VENTA
   tipologia     String
-  monto         Float    @default(0)
+  monto         Float    @default(0) // USD a costo, con el signo de la fuente
+  // Piezas o kilos ajustados. Van aparte del monto porque la merma de un kilo de carne y la de
+  // una caja de fósforos pesan distinto en dólares: sumar unidades no dice dónde se pierde dinero.
+  unidades      Float?
   porcentaje    Float?
   origen        String   @default("MANUAL")
   actualizadoEn DateTime @updatedAt
@@ -256,6 +312,7 @@ model Categoria {
   alias String?
 
   registros RegistroCategoria[]
+  ajustes   RegistroAjusteCategoria[]
 }
 
 model RegistroCategoria {

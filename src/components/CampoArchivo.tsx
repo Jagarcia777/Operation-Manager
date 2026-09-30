@@ -29,7 +29,7 @@ export function CampoArchivo({
     <div>
       <label className="block text-sm">
         <span className="text-texto-2">
-          Archivo ({etiqueta ?? "PDF, PNG, JPG o WEBP"}, hasta {maximoMb} MB)
+          Archivo ({etiqueta ?? "PDF, imagen o Excel"}, hasta {maximoMb} MB)
         </span>
         <input
           type="file"
