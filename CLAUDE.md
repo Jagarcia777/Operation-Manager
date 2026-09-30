@@ -42,9 +42,10 @@ src/app/api/              route handlers (extracción IA, exportaciones)
 src/lib/db.ts             singleton de PrismaClient
 src/lib/calculos.ts       KPIs derivados, subtotales por zona, proyección, aportes
 src/lib/plantilla.ts      eficiencia laboral: horas ganadas, índice por área, cobertura
-src/lib/ritmo.ts          serie diaria de la cadena y sus dos comparativos
+src/lib/ritmo.ts          serie diaria de la cadena, sus dos comparativos y el perfil semanal
 src/lib/areas.ts          las 14 áreas de tienda con su KPI y su rango de referencia
 src/lib/validacion.ts     motor de alertas (nunca corrige, solo marca)
+src/lib/csv.ts            importación CSV con plantilla fija (entra como propuesta)
 src/lib/analisis/         cerebro analítico: evidencia determinista + asesoría con IA
 src/lib/extraccion/       ingesta con IA de PDF/imagen
 src/lib/extraccion/resumen.ts    guarda el Resumen Ejecutivo de la cadena (día + acumulado)

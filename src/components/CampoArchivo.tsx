@@ -11,10 +11,13 @@ export function CampoArchivo({
   nombre,
   acepta,
   maximoBytes,
+  etiqueta,
 }: {
   nombre: string;
   acepta: string;
   maximoBytes: number;
+  /** Los formatos que se aceptan, en palabras; por omisión, los documentos que lee la IA. */
+  etiqueta?: string;
 }) {
   const [excedido, setExcedido] = useState<string | null>(null);
   const maximoMb = Math.round(maximoBytes / (1024 * 1024));
@@ -23,7 +26,7 @@ export function CampoArchivo({
     <div>
       <label className="block text-sm">
         <span className="text-texto-2">
-          Archivo (PDF, PNG, JPG o WEBP, hasta {maximoMb} MB)
+          Archivo ({etiqueta ?? "PDF, PNG, JPG o WEBP"}, hasta {maximoMb} MB)
         </span>
         <input
           type="file"

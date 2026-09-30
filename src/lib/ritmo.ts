@@ -110,3 +110,75 @@ export function resumirRitmo(serie: PuntoDiario[]): ResumenRitmo {
     peor: conDato.at(-1) ?? null,
   };
 }
+
+// ─── Perfil por día de la semana ────────────────────────────────────────────
+// El otro uso de la serie diaria: saber cuánto pesa cada día en la semana. Sirve para dos
+// decisiones que hoy se toman a ojo —dónde poner horas de caja y reposición, y si un martes
+// flojo es flojo de verdad o solo es martes— y para eso no basta una semana: un feriado o una
+// quincena la tuercen. Se promedian varias semanas y se dice con cuántas.
+
+export type DiaDelPerfil = {
+  /** 0 = domingo … 6 = sábado, como `getUTCDay`. */
+  indice: number;
+  diaSemana: string;
+  /** Promedio de ese día en la ventana, sin contar la última vez que ocurrió. */
+  promedio: number | null;
+  /** Cuántas veces entró al promedio. */
+  observaciones: number;
+  /** 100 = día promedio de la semana; 120 = vende 20 % más que el día típico. */
+  indiceSemana: number | null;
+  /** Qué parte de la venta de una semana típica cae ese día. */
+  pesoSemana: number | null;
+  /** La última vez que ocurrió ese día, contra su propio promedio. */
+  ultimo: { fecha: Date; ventas: number; variacion: number | null } | null;
+};
+
+export type PerfilSemanal = { semanas: number; dias: DiaDelPerfil[] };
+
+/**
+ * Promedio por día de la semana en las últimas `semanas`. La última ocurrencia de cada día queda
+ * fuera de su propio promedio: es la que se juzga, y compararla contra un promedio que la incluye
+ * achica la diferencia justo cuando más importa. El índice y el peso se calculan sobre los
+ * promedios —no sobre la suma de días—, así un día con menos observaciones no pesa de menos.
+ */
+export function perfilSemanal(serie: PuntoDiario[], semanas = 8): PerfilSemanal | null {
+  if (!serie.length) return null;
+  const ordenada = [...serie].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+  const limite = restarDias(ordenada[0].fecha, semanas * 7).getTime();
+  const ventana = ordenada.filter((punto) => punto.fecha.getTime() > limite);
+
+  const base = DIAS.map((diaSemana, indice) => {
+    const delDia = ventana.filter((punto) => punto.fecha.getUTCDay() === indice);
+    const [ultimo, ...previos] = delDia;
+    const promedio = promediar(previos.map((punto) => punto.ventas));
+    return {
+      indice,
+      diaSemana,
+      promedio,
+      observaciones: previos.length,
+      ultimo: ultimo
+        ? {
+            fecha: ultimo.fecha,
+            ventas: ultimo.ventas,
+            variacion: variacion(ultimo.ventas, promedio),
+          }
+        : null,
+    };
+  });
+
+  // Sin al menos dos semanas no hay perfil: un solo lunes no es "los lunes".
+  const conPromedio = base.filter((dia) => dia.promedio !== null);
+  if (conPromedio.length < 7) return null;
+
+  const semanaTipica = conPromedio.reduce((total, dia) => total + dia.promedio!, 0);
+  const diaTipico = semanaTipica / 7;
+
+  // Lunes primero: así se lee una semana de operación.
+  const dias = [...base.slice(1), base[0]].map((dia) => ({
+    ...dia,
+    indiceSemana: dia.promedio === null ? null : (dia.promedio / diaTipico) * 100,
+    pesoSemana: dia.promedio === null ? null : (dia.promedio / semanaTipica) * 100,
+  }));
+
+  return { semanas: Math.min(semanas, Math.max(...dias.map((dia) => dia.observaciones + 1))), dias };
+}

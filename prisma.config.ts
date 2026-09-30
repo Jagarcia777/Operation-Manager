@@ -13,8 +13,10 @@ try {
  * conexión en `src/lib/db.ts`. Se prefiere la conexión directa porque las migraciones toman
  * bloqueos de sesión que un pool en modo transacción (pgbouncer, el pooler de Neon) descarta.
  */
+// `||` y no `??`: `.env.example` deja DIRECT_URL="" para un Postgres propio, y una cadena vacía
+// no es una conexión.
 const url =
-  process.env.DIRECT_URL ?? process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+  process.env.DIRECT_URL || process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),

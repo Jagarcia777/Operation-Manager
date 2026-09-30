@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { TAMANO_MAXIMO, TIPOS_ACEPTADOS, metaDeclarada } from "@/lib/carga";
+import { leerCsvVentas } from "@/lib/csv";
 import { prisma } from "@/lib/db";
 import { TIPOLOGIAS, type Tipologia } from "@/lib/dominio";
 import {
@@ -17,6 +18,47 @@ import { guardarResumenEjecutivo } from "@/lib/extraccion/resumen";
 import { leerUmbrales, revisarSubtotal, sincronizarAlertas } from "@/lib/validacion";
 
 
+/** Marca de las cargas que vienen de una hoja de cálculo y no de la lectura con IA. */
+const MODELO_CSV = "CSV";
+
+/**
+ * Importación CSV con plantilla fija. Pasa por la misma revisión que la lectura con IA: el
+ * archivo se guarda como original de auditoría y lo leído queda como propuesta hasta que
+ * alguien lo confirme.
+ */
+export async function importarCsv(formData: FormData) {
+  const corteId = String(formData.get("corteId") ?? "");
+  const archivo = formData.get("archivo");
+
+  if (!corteId || !(archivo instanceof File) || archivo.size === 0) {
+    redirect("/cargar/csv?error=falta");
+  }
+  if (archivo.size > TAMANO_MAXIMO) {
+    redirect("/cargar/csv?error=peso");
+  }
+
+  const buffer = Buffer.from(await archivo.arrayBuffer());
+  const resultado = leerCsvVentas(buffer.toString("utf8"));
+  if (!resultado.ok) {
+    redirect(`/cargar/csv?corte=${corteId}&error=${encodeURIComponent(resultado.error)}`);
+  }
+
+  const extraccion = await prisma.extraccion.create({
+    data: {
+      corteId,
+      destino: "VENTAS",
+      archivoNombre: archivo.name,
+      archivoTipo: "text/csv",
+      archivoContenido: buffer,
+      estado: "EXTRAIDO",
+      modelo: MODELO_CSV,
+      respuestaCruda: JSON.stringify(resultado.lectura),
+    },
+  });
+
+  revalidatePath("/cargar");
+  redirect(`/cargar/${extraccion.id}`);
+}
 
 export async function subirYExtraer(formData: FormData) {
   const corteId = String(formData.get("corteId") ?? "");
@@ -107,6 +149,7 @@ export async function confirmarExtraccion(formData: FormData) {
   if (!extraccion.corteId) throw new Error("La extracción no tiene corte asociado.");
 
   const corteId = extraccion.corteId;
+  const origen = extraccion.modelo === MODELO_CSV ? "CSV" : "IA";
   const filas = Number(formData.get("filas") ?? 0);
 
   for (let indice = 0; indice < filas; indice++) {
@@ -135,8 +178,8 @@ export async function confirmarExtraccion(formData: FormData) {
 
         await prisma.registroAjuste.upsert({
           where: { corteId_tiendaId_tipologia: { corteId, tiendaId, tipologia } },
-          update: { monto, porcentaje, origen: "IA" },
-          create: { corteId, tiendaId, tipologia, monto, porcentaje, origen: "IA" },
+          update: { monto, porcentaje, origen },
+          create: { corteId, tiendaId, tipologia, monto, porcentaje, origen },
         });
       }
       continue;
@@ -155,8 +198,8 @@ export async function confirmarExtraccion(formData: FormData) {
 
     await prisma.registroVentas.upsert({
       where: { corteId_tiendaId: { corteId, tiendaId } },
-      update: { ...valores, origen: "IA" },
-      create: { corteId, tiendaId, ...valores, origen: "IA" },
+      update: { ...valores, origen },
+      create: { corteId, tiendaId, ...valores, origen },
     });
   }
 

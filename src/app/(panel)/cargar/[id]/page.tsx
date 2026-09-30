@@ -120,7 +120,10 @@ export default async function RevisarExtraccionPage({ params }: PageProps<"/carg
         <h1 className="text-2xl">Revisar lectura</h1>
         <p className="mt-1 max-w-2xl text-sm text-texto-2">
           {extraccion.archivoNombre} · {extraccion.corte?.nombre}. Confirma o corrige antes de
-          guardar: lo que el modelo no pudo leer viene en blanco, y así se queda si no lo llenas.
+          guardar:{" "}
+          {extraccion.modelo === "CSV"
+            ? "lo que venía vacío en la hoja sigue en blanco, y así se queda si no lo llenas."
+            : "lo que el modelo no pudo leer viene en blanco, y así se queda si no lo llenas."}
         </p>
       </header>
 
