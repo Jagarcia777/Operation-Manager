@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import type { LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
+import { buscarBajoCosto, type LecturaCategoriasTienda } from "@/lib/extraccion/categoriasTienda";
 import { emparejarTienda, indiceDeCategorias, normalizar } from "@/lib/extraccion/emparejar";
 import { datosDelCorte } from "@/lib/extraccion/guardarCategorias";
 import { moneda, numero, porcentaje } from "@/lib/formato";
@@ -213,6 +213,31 @@ export async function RevisarCategorias({
           El «% impreso» no siempre es la venta de la categoría entre el total; la aplicación usa
           la columna de al lado, que sí lo es. Donde difieren se marca en ámbar.
         </p>
+
+        {(lectura.topProductos?.length ?? 0) > 0 && (
+          <section className="tarjeta p-4">
+            <h2 className="text-sm font-semibold">Lo que más vende la tienda</h2>
+            <ol className="mt-2 grid gap-x-6 gap-y-1 text-sm text-texto-2 sm:grid-cols-2">
+              {lectura.topProductos!.map((producto) => {
+                const bajoCosto = Boolean(buscarBajoCosto(producto.producto, lectura.bajoCosto));
+                return (
+                  <li key={producto.posicion} className="flex justify-between gap-3">
+                    <span>
+                      <span className="mr-2 text-texto-3 tabular-nums">{producto.posicion}</span>
+                      {producto.producto}
+                      {bajoCosto && (
+                        <span className="chip ml-2 bg-alerta-tenue text-alerta">bajo costo</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-texto-3 tabular-nums">
+                      {producto.ventasAprox ? `~${moneda(producto.ventasAprox)}` : "—"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        )}
 
         {lectura.bajoCosto.length > 0 && (
           <section className="tarjeta p-4">

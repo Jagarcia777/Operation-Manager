@@ -91,6 +91,7 @@ model Tienda {
   plantilla    RegistroPlantilla[]
   bajoCosto    ProductoBajoCosto[]
   ajustesCategoria RegistroAjusteCategoria[]
+  topProductos     TopProductoTienda[]
 
   @@index([zonaId])
 }
@@ -121,6 +122,7 @@ model Corte {
   bajoCosto     ProductoBajoCosto[]
   ajustesCategoria  RegistroAjusteCategoria[]
   ajustesReferencia AjusteReferencia[]
+  topProductos      TopProductoTienda[]
 }
 
 // Lectura del cerebro analítico sobre un corte. Se guarda para no volver a pedirla y para
@@ -229,6 +231,26 @@ model AjusteReferencia {
   creadoEn DateTime @default(now())
 
   @@unique([corteId, ambito, nombre, tipologia])
+}
+
+// Top de productos por venta de una tienda, tal como lo grafica su reporte por categoría. No
+// se enlaza al catálogo de productos: el gráfico corta los nombres largos y redondea la venta
+// ("135 mil"), así que es una referencia de qué sostiene la venta de la tienda, no una cifra
+// para sumar.
+model TopProductoTienda {
+  id          String @id @default(cuid())
+  corteId     String
+  tiendaId    String
+  corte       Corte  @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  tienda      Tienda @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  posicion    Int
+  producto    String
+  ventasAprox Float?
+
+  origen   String   @default("PDF")
+  creadoEn DateTime @default(now())
+
+  @@unique([corteId, tiendaId, posicion])
 }
 
 // Productos que una tienda vendió a costo o por debajo en el período, tal como los lista el

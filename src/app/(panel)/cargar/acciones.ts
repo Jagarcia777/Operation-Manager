@@ -154,6 +154,23 @@ async function leerArchivo(archivo: File, destino: string, corteId: string, unic
     return extraccion.id;
   }
 
+  // Estos dos solo se leen por su texto. Si el archivo no es el esperado —una foto, un
+  // escaneo, otro reporte—, se dice por qué en vez de pedir un corte que la pantalla no muestra.
+  const soloLector: Record<string, string> = {
+    CATEGORIAS:
+      "No se reconoce como el reporte de ventas por categoría de una tienda. Tiene que ser el PDF " +
+      "exportado del tablero, con su texto: una foto o un escaneo no se puede leer así.",
+    LIBRO_AJUSTES:
+      "No se reconoce como el libro «Ajustes de inventario vs ventas». Tiene que ser el archivo de " +
+      "Excel (.xlsx) con sus dos hojas.",
+  };
+  if (soloLector[destino]) {
+    const extraccion = await prisma.extraccion.create({
+      data: { ...base, destino, estado: "ERROR", error: soloLector[destino] },
+    });
+    return extraccion.id;
+  }
+
   // El Resumen Ejecutivo trae su propia fecha y crea sus dos cortes —el día y el acumulado del
   // mes—; los demás documentos se cargan contra un corte ya existente.
   const creaSuCorte = destino === "RESUMEN";
@@ -232,7 +249,7 @@ export async function confirmarExtraccion(formData: FormData) {
     return confirmarResumen(extraccion.id, extraccion.respuestaCruda);
   }
   if (extraccion.destino === "CATEGORIAS") {
-    return confirmarCategorias(extraccion.id, extraccion.respuestaCruda, formData);
+    return confirmarCategorias(extraccion, formData);
   }
   if (extraccion.destino === "LIBRO_AJUSTES") {
     return confirmarLibroAjustes(extraccion.id, extraccion.respuestaCruda);
@@ -435,8 +452,7 @@ async function confirmarResumen(extraccionId: string, respuestaCruda: string | n
 }
 
 async function confirmarCategorias(
-  extraccionId: string,
-  respuestaCruda: string | null,
+  { id: extraccionId, respuestaCruda, creadaEn }: { id: string; respuestaCruda: string | null; creadaEn: Date },
   formData: FormData,
 ) {
   if (!respuestaCruda) throw new Error("La lectura del documento está vacía.");
@@ -444,7 +460,12 @@ async function confirmarCategorias(
   if (!tiendaId) redirect(`/cargar/${extraccionId}?error=tienda`);
 
   const lectura = JSON.parse(respuestaCruda) as LecturaCategoriasTienda;
-  const resultado = await guardarCategoriasTienda(prisma, lectura, tiendaId);
+  // Todo o nada: el guardado borra y reescribe varias tablas del corte, y quedarse a medias
+  // dejaría el corte sin lo viejo y con lo nuevo incompleto.
+  const resultado = await prisma.$transaction(
+    (tx) => guardarCategoriasTienda(tx, lectura, tiendaId),
+    { maxWait: 10_000, timeout: 60_000 },
+  );
 
   await prisma.extraccion.update({
     where: { id: extraccionId },
@@ -454,9 +475,18 @@ async function confirmarCategorias(
 
   revalidatePath("/", "layout");
 
-  // Con varios reportes subidos de una vez, al confirmar uno se pasa directo al siguiente.
+  // Con varios reportes subidos de una vez, al confirmar uno se pasa directo al siguiente de
+  // esa misma subida; uno viejo que alguien dejó sin confirmar no se cuela en la cola.
+  const misma = 10 * 60_000;
   const siguiente = await prisma.extraccion.findFirst({
-    where: { destino: "CATEGORIAS", estado: "EXTRAIDO" },
+    where: {
+      destino: "CATEGORIAS",
+      estado: "EXTRAIDO",
+      creadaEn: {
+        gte: new Date(creadaEn.getTime() - misma),
+        lte: new Date(creadaEn.getTime() + misma),
+      },
+    },
     orderBy: { creadaEn: "asc" },
     select: { id: true },
   });
@@ -470,7 +500,10 @@ async function confirmarCategorias(
 async function confirmarLibroAjustes(extraccionId: string, respuestaCruda: string | null) {
   if (!respuestaCruda) throw new Error("La lectura del libro está vacía.");
   const lectura = JSON.parse(respuestaCruda) as LecturaLibroAjustes;
-  const resultado = await guardarLibroAjustes(prisma, lectura);
+  const resultado = await prisma.$transaction((tx) => guardarLibroAjustes(tx, lectura), {
+    maxWait: 10_000,
+    timeout: 60_000,
+  });
 
   await prisma.extraccion.update({
     where: { id: extraccionId },

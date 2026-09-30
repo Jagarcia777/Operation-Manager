@@ -50,8 +50,12 @@ export async function RevisarLibroAjustes({
   const cadenaPorCategoria = new Map(
     lectura.categoriasCadena.map((fila) => [fila.categoria, fila]),
   );
+  const magnitudCategorias = [...porCategoria.values()].reduce(
+    (total, fila) => total + Math.abs(fila.monto),
+    0,
+  );
   const categorias = [...porCategoria]
-    .sort((a, b) => a[1].monto - b[1].monto)
+    .sort((a, b) => Math.abs(b[1].monto) - Math.abs(a[1].monto))
     .slice(0, 8);
 
   return (
@@ -179,7 +183,7 @@ export async function RevisarLibroAjustes({
                   <tr key={categoria}>
                     <td className="text-left">{categoria}</td>
                     <td>{moneda(valores.monto)}</td>
-                    <td>{porcentaje(sobre(valores.monto, zona.monto))}</td>
+                    <td>{porcentaje(sobre(Math.abs(valores.monto), magnitudCategorias))}</td>
                     <td className="font-medium">{porcentaje(sobre(valores.monto, valores.ventas), 2)}</td>
                     <td className="text-texto-2">
                       {porcentaje(sobre(cadena?.monto ?? null, cadena?.ventas ?? null), 2)}

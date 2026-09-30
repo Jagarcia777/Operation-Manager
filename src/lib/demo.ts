@@ -285,7 +285,9 @@ export async function generarDemo(prisma: PrismaClient): Promise<ResumenDemo> {
         INVENTARIO: -perfil.inventario,
         VENTAS: 0,
       };
-      for (const [indiceTipo, tipologia] of TIPOLOGIAS.entries()) {
+      // Solo las tipologías del reporte clásico: las que llegan por el libro de ajustes
+      // (donación, mercadeo, hurto) no tienen perfil en el demo, y sin peso darían NaN.
+      for (const [indiceTipo, tipologia] of TIPOLOGIAS.filter((tipo) => tipo in pesos).entries()) {
         const base = pesos[tipologia];
         const porcentaje =
           tipologia === "VENTAS"

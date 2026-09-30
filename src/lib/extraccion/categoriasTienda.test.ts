@@ -6,6 +6,9 @@ import {
   esProblemaDeCadena,
   esReporteCategoriasTienda,
   leerCategoriasTienda,
+  buscarBajoCosto,
+  leerMagnitud,
+  mismoProducto,
   type ItemTexto,
 } from "./categoriasTienda";
 
@@ -36,6 +39,21 @@ function reporte({
     { texto: "sucursal", x: 655, y: 1066 },
     { texto: "PUERTO O…", x: 658, y: 1044 },
     { texto: "", x: 717, y: 1043 },
+    // El top: nombres a la izquierda, etiquetas de barra a la derecha y marcas del eje debajo.
+    { texto: "TOP 20 Productos de mayor venta", x: 457, y: 778 },
+    { texto: "0 mil", x: 591, y: 584 },
+    { texto: "100 mil", x: 812, y: 584 },
+    { texto: "Ventas USD", x: 728, y: 572 },
+    { texto: "Producto", x: 466, y: 659 },
+    { texto: "CARNE DE PRIMERA.", x: 525, y: 750 },
+    { texto: "COSTILLA RES", x: 545, y: 734 },
+    { texto: "LECHE EN POLVO COMPLETA CA…", x: 484, y: 718 },
+    // Un nombre cortado con dígitos: por su forma parece etiqueta, por su posición es nombre.
+    { texto: "HARINA PAN 1KG AMARI…", x: 486, y: 702 },
+    { texto: "135 mil", x: 605, y: 750 },
+    { texto: "8 mil", x: 605, y: 734 },
+    { texto: "13 …", x: 605, y: 718 },
+    { texto: "7 mil", x: 605, y: 702 },
     { texto: "Productos vendidos con costo mayor o igual al PVP", x: 457, y: 989 },
     { texto: "Sucursal", x: 461, y: 971 },
     { texto: "barra", x: 539, y: 971 },
@@ -194,5 +212,40 @@ describe("datosDelCorte", () => {
       tipo: "SEMANAL",
       diasTranscurridos: 7,
     });
+  });
+});
+
+describe("top de productos de la tienda", () => {
+  it("lee el top en orden, sin las marcas del eje", () => {
+    assert.deepEqual(leerCategoriasTienda(reporte()).topProductos, [
+      { posicion: 1, producto: "CARNE DE PRIMERA.", ventasAprox: 135000 },
+      { posicion: 2, producto: "COSTILLA RES", ventasAprox: 8000 },
+      { posicion: 3, producto: "LECHE EN POLVO COMPLETA CA…", ventasAprox: null },
+      { posicion: 4, producto: "HARINA PAN 1KG AMARI…", ventasAprox: 7000 },
+    ]);
+  });
+
+  it("lee las etiquetas redondeadas y no adivina las cortadas", () => {
+    assert.equal(leerMagnitud("135 mil"), 135000);
+    assert.equal(leerMagnitud("2 mill."), 2000000);
+    assert.equal(leerMagnitud("1,5 mill."), 1500000);
+    assert.equal(leerMagnitud("13 …"), null);
+  });
+
+  it("casa un nombre cortado del top con el nombre completo", () => {
+    assert.ok(mismoProducto("LECHE EN POLVO COMPLETA CA…", "LECHE EN POLVO COMPLETA CAMPIÑA 862G"));
+    assert.ok(mismoProducto("COSTILLA RES", "Costilla res"));
+    assert.equal(mismoProducto("COSTILLA RES", "COSTILLA RES AHUMADA"), false);
+  });
+
+  it("no afirma nada con un prefijo corto ni cuando casa con dos productos", () => {
+    assert.equal(mismoProducto("HARINA PAN…", "HARINA PAN AMARILLA 1KG"), false);
+    assert.equal(mismoProducto("…", "CUALQUIER COSA"), false);
+    const lista = [
+      { producto: "LECHE EN POLVO COMPLETA CAMPIÑA 862G" },
+      { producto: "LECHE EN POLVO COMPLETA CARABOBO 400G" },
+    ];
+    assert.equal(buscarBajoCosto("LECHE EN POLVO COMPLETA CA…", lista), null);
+    assert.equal(buscarBajoCosto("LECHE EN POLVO COMPLETA CA…", lista.slice(0, 1)), lista[0]);
   });
 });

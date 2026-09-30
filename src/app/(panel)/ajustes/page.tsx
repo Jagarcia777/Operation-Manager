@@ -200,8 +200,12 @@ function AjustePorCategoria({ registros }: { registros: RegistroCategoria[] }) {
   };
   const zona = agrupar(deZona);
   const cadena = agrupar(registros.filter((registro) => registro.tiendaId === null));
-  const totalZona = [...zona.values()].reduce((total, fila) => total + fila.monto, 0);
-  const filas = [...zona].filter(([, valores]) => valores.monto).sort((a, b) => a[1].monto - b[1].monto);
+  // Magnitudes, no montos con signo: una categoría con ajuste a favor también pesa, y el peso
+  // de cada una se mide contra la suma de magnitudes para que no pase del 100 %.
+  const totalZona = [...zona.values()].reduce((total, fila) => total + Math.abs(fila.monto), 0);
+  const filas = [...zona]
+    .filter(([, valores]) => valores.monto)
+    .sort((a, b) => Math.abs(b[1].monto) - Math.abs(a[1].monto));
   const principales = filas.slice(0, 3).map(([nombre]) => nombre);
   const tiendas = [...new Set(deZona.map((registro) => registro.tienda!.nombre))];
   const celda = (tienda: string, categoria: string) => {
@@ -237,7 +241,7 @@ function AjustePorCategoria({ registros }: { registros: RegistroCategoria[] }) {
                 <tr key={nombre}>
                   <td className="text-left">{nombre}</td>
                   <td>{moneda(valores.monto)}</td>
-                  <td className="text-texto-2">{porcentaje(sobre(valores.monto, totalZona))}</td>
+                  <td className="text-texto-2">{porcentaje(sobre(Math.abs(valores.monto), totalZona))}</td>
                   <td className="font-medium">{porcentaje(sobre(valores.monto, valores.ventas), 2)}</td>
                   <td className="text-texto-2">
                     {deCadena ? porcentaje(sobre(deCadena.monto, deCadena.ventas), 2) : "—"}
